@@ -1,0 +1,11 @@
+/* 全局：隐藏 number 输入框的上下微调箭头（占宽、窄列难用） */
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}

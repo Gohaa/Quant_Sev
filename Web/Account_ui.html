@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账户管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            padding: 20px;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+            gap: 20px;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .left-panel .panel {
+            padding: 8px 12px;
+        }
+
+        .left-panel .panel-title {
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+        }
+
+        .left-panel .panel-intro {
+            font-size: 12px;
+            color: #95a5a6;
+            margin: -4px 0 6px 0;
+            line-height: 1.35;
+        }
+
+        .left-panel .account-table th,
+        .left-panel .account-table td {
+            padding: 5px;
+        }
+
+        .left-panel .account-form {
+            gap: 8px;
+        }
+
+        .left-panel .form-group,
+        .left-panel .form-group-name-row .form-name-field {
+            gap: 3px;
+        }
+
+        .left-panel .form-label {
+            line-height: 1.3;
+        }
+
+        .left-panel .form-input {
+            padding: 4px 8px;
+        }
+
+        .left-panel .schedule-section {
+            padding: 5px;
+        }
+
+        .left-panel .schedule-title {
+            margin-bottom: 5px;
+        }
+
+        .left-panel .schedule-row {
+            gap: 5px;
+            margin-bottom: 4px;
+        }
+
+        .left-panel .schedule-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .left-panel .action-buttons {
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .action-buttons .btn-conn {
+            padding-left: 7px;
+            padding-right: 7px;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .right-panel.logger-embed-panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .right-panel .logger-embed-frame {
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            border: none;
+        }
+
+        .btn-secondary {
+            background-color: #5d6d7e;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #4a5a6a;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        /* 账户列表表格 */
+        .account-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .account-table thead {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .account-table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .account-table td {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .account-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .account-table tbody tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .account-table tbody tr.selected {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .status-connected {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .status-disconnected {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        /* 账户连接与设置表单 */
+        .account-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group-name-row {
+            grid-column: span 2;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        .form-group-name-row .form-name-field {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .btn-delete-acc {
+            flex-shrink: 0;
+            margin-bottom: 2px;
+            white-space: nowrap;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: #95a5a6;
+            font-weight: 500;
+        }
+
+        .form-input {
+            padding: 8px 12px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-input:read-only {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #95a5a6;
+        }
+
+        /* 定时设置区域 */
+        .schedule-section {
+            grid-column: span 2;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .schedule-title {
+            font-size: 13px;
+            color: #3498db;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .schedule-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .schedule-label {
+            width: 100px;
+            font-size: 12px;
+            color: #95a5a6;
+        }
+
+        .schedule-input {
+            flex: 1;
+            padding: 5px 8px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+
+        .schedule-btn {
+            padding: 5px 10px;
+            background-color: rgba(52, 152, 219, 0.2);
+            border: 1px solid #3498db;
+            border-radius: 4px;
+            color: #3498db;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .schedule-btn:hover {
+            background-color: rgba(52, 152, 219, 0.3);
+        }
+
+        /* 操作按钮 */
+        .action-buttons {
+            grid-column: span 2;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-warning {
+            background-color: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #d68910;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+
+        .account-table .cell-actions {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .account-table .cell-actions .btn {
+            margin: 0;
+            flex: 0 0 auto;
+        }
+
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧面板 -->
+        <div class="left-panel">
+            <!-- 账户列表 -->
+            <div class="panel">
+                <div class="panel-title">📊 账户列表</div>
+                <table class="account-table">
+                    <thead>
+                        <tr>
+                            <th>账户名称</th>
+                            <th>账号</th>
+                            <th>类型</th>
+                            <th>行情连接</th>
+                            <th>交易连接</th>
+                        </tr>
+                    </thead>
+                    <tbody id="account-list">
+                        <!-- 由 logger_Bridge 根据 GET /api/saved_accounts（即 config/Account.json）填充 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 账户连接与设置 -->
+            <div class="panel">
+                <div class="panel-title">⚙️ 账户连接与设置</div>
+                <p class="panel-intro">
+                    列表与连接参数来自 <code style="color:#3498db;">config/Account.json</code>。交易按账户独立连接；<strong>相同行情前置地址只登录一次</strong>（多账户共享行情，列表行情状态同前置）。<strong>点击列表行</strong>即可在下方编辑并连接。
+                </p>
+                <div class="account-form">
+                    <div class="form-group-name-row">
+                        <div class="form-name-field">
+                            <label class="form-label">显示名称（保存用）</label>
+                            <input type="text" class="form-input" id="acc-name" placeholder="SimNow">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">资金账号 UserID</label>
+                        <input type="text" class="form-input" id="acc-user" placeholder="与 JSON 中 user_id 一致" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">密码（修改账户时填写；留空保存则保留原密码）</label>
+                        <input type="password" class="form-input" id="acc-ctp-pass" placeholder="连接可不填，走服务端已存密码">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">行情前置</label>
+                        <input type="text" class="form-input" id="acc-md-front" placeholder="tcp://180.168.146.187:10131">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">交易前置</label>
+                        <input type="text" class="form-input" id="acc-td-front" placeholder="tcp://180.168.146.187:10130">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">BrokerID</label>
+                        <input type="text" class="form-input" id="acc-broker" placeholder="9999">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">AppID</label>
+                        <input type="text" class="form-input" id="acc-appid" placeholder="simnow_client_test">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">AuthCode</label>
+                        <input type="text" class="form-input" id="acc-auth" placeholder="0000000000000000">
+                    </div>
+                    <!-- 操作按钮（HTTP 模式下由 logger_Bridge 绑定 /api/*；无 CppBridge 时勿用 onclick） -->
+                    <div class="action-buttons">
+                        <button type="button" class="btn btn-primary" id="btn-save-acc">💾 保存账户</button>
+                        <button type="button" class="btn btn-success btn-conn" id="btn-md-connect">📈 行情连接</button>
+                        <button type="button" class="btn btn-danger btn-conn" id="btn-md-disconnect">📉 行情断开</button>
+                        <button type="button" class="btn btn-success btn-conn" id="btn-td-connect">💹 交易连接</button>
+                        <button type="button" class="btn btn-danger btn-conn" id="btn-td-disconnect">🔴 交易断开</button>
+                    </div>
+                    <!-- 定时设置 -->
+                    <div class="schedule-section">
+                        <div class="schedule-title">⏰ 定时任务设置</div>
+                        <div class="schedule-row">
+                            <span class="schedule-label">定时连接1：</span>
+                            <input type="time" class="schedule-input" id="schedule-connect1">
+                            <button class="schedule-btn" onclick="setSchedule('connect1')">设置</button>
+                        </div>
+                        <div class="schedule-row">
+                            <span class="schedule-label">定时断开1：</span>
+                            <input type="time" class="schedule-input" id="schedule-disconnect1">
+                            <button class="schedule-btn" onclick="setSchedule('disconnect1')">设置</button>
+                        </div>
+                        <div class="schedule-row">
+                            <span class="schedule-label">定时连接2：</span>
+                            <input type="time" class="schedule-input" id="schedule-connect2">
+                            <button class="schedule-btn" onclick="setSchedule('connect2')">设置</button>
+                        </div>
+                        <div class="schedule-row">
+                            <span class="schedule-label">定时断开2：</span>
+                            <input type="time" class="schedule-input" id="schedule-disconnect2">
+                            <button class="schedule-btn" onclick="setSchedule('disconnect2')">设置</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：连接日志（嵌入 Logger.html） -->
+        <div class="right-panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 连接日志
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-log" style="float:right;">清空</button>
+            </div>
+            <iframe class="logger-embed-frame" data-log-id="acc-log" src="Logger.html?embed=1" title="连接日志"></iframe>
+        </div>
+    </div>
+
+    <script src="logger_Bridge.js?v=2"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) {
+                QuantSevBridge.Logger.autoInitPage();
+            }
+        });
+    </script>
+</body>
+</html>

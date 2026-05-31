@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>风险管理</title>
+    <link rel="stylesheet" href="logger_embed.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+        .risk-wrap {
+            display: grid;
+            grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+            gap: 12px;
+            height: 100%;
+            padding: 12px;
+        }
+        .risk-main {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 12px 14px;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .risk-log-panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .risk-log-panel.logger-embed-panel .logger-embed-frame {
+            flex: 1;
+            min-height: 0;
+        }
+        .risk-log-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+        .risk-log {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            background: #252525;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: clamp(6px, 1vw, 12px);
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: clamp(0.6875rem, 0.55rem + 0.45vw, 1rem);
+            line-height: 1.5;
+            color: #bdc3c7;
+        }
+        .risk-section {
+            margin-bottom: 14px;
+        }
+        .risk-section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #5dade2;
+            margin-bottom: 8px;
+        }
+        .risk-divider {
+            height: 1px;
+            background: rgba(52, 152, 219, 0.35);
+            margin: 10px 0;
+        }
+        .risk-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            font-size: 12px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .risk-label {
+            min-width: 120px;
+            color: #ecf0f1;
+        }
+        .risk-th {
+            width: 72px;
+            padding: 4px 8px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+        .risk-th:focus { outline: none; border-color: #3498db; }
+        .btn-save {
+            padding: 4px 10px;
+            font-size: 11px;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: #fff;
+            cursor: pointer;
+        }
+        .btn-save:hover { background: #2980b9; }
+        .btn-query {
+            padding: 4px 10px;
+            font-size: 11px;
+            border: none;
+            border-radius: 4px;
+            background: #5d6d7e;
+            color: #fff;
+            cursor: pointer;
+        }
+        .btn-query:hover { background: #4a5a6a; }
+        .risk-stat { color: #95a5a6; }
+        .risk-stat em { color: #f39c12; font-style: normal; font-weight: 600; }
+        .risk-note {
+            font-size: 11px;
+            color: #95a5a6;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+        .risk-row-sl {
+            display: grid;
+            grid-template-columns: 120px 80px 72px 90px 56px 100px auto;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        @media (max-width: 1100px) {
+            .risk-row-sl { grid-template-columns: 1fr; }
+        }
+        .sl-count { width: 56px; }
+        .sl-state {
+            padding: 4px 6px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+        .risk-live-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .risk-live-card {
+            background: #252525;
+            border: 1px solid rgba(52, 152, 219, 0.25);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+        }
+        .risk-live-card .label { color: #888; }
+        .risk-live-card .value { color: #f39c12; font-weight: 600; margin-top: 4px; font-size: 14px; }
+        .risk-ok { color: #2ecc71 !important; }
+        .risk-bad { color: #e74c3c !important; }
+        .risk-mini-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+        .risk-mini-table th, .risk-mini-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="risk-wrap">
+        <div class="risk-main">
+            <div class="risk-section" id="risk-live-section">
+                <div class="risk-section-title">Gateway 实时状态 <button type="button" class="btn-query" id="risk-refresh-btn">刷新</button></div>
+                <div class="risk-live-grid">
+                    <div class="risk-live-card"><div class="label">交易时段</div><div class="value" id="risk-live-session">—</div></div>
+                    <div class="risk-live-card"><div class="label">风险度</div><div class="value" id="risk-live-degree">—</div></div>
+                    <div class="risk-live-card"><div class="label">近1分钟报单</div><div class="value" id="risk-live-rate">—</div></div>
+                    <div class="risk-live-card"><div class="label">CTP 权益</div><div class="value" id="risk-live-balance">—</div></div>
+                    <div class="risk-live-card"><div class="label">CTP 可用</div><div class="value" id="risk-live-available">—</div></div>
+                    <div class="risk-live-card"><div class="label">CTP 保证金</div><div class="value" id="risk-live-margin">—</div></div>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">资金校验：</span>
+                    <label class="risk-stat"><input type="checkbox" id="risk-use-ctp" checked> 使用 CTP 真实资金</label>
+                    <button type="button" class="btn-save" data-risk-save="use_ctp">保存</button>
+                    <span class="risk-stat">来源：<em id="risk-capital-source">—</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">应急停单：</span>
+                    <span class="risk-stat">状态：<em id="risk-live-halt">—</em></span>
+                    <span class="risk-stat">策略暂停：<em id="risk-live-strategy-halt">—</em></span>
+                    <span class="risk-stat">总持仓：<em id="risk-live-lots">—</em></span>
+                    <span class="risk-stat">净持仓：<em id="risk-live-net">—</em></span>
+                </div>
+                <table class="risk-mini-table">
+                    <thead><tr><th>品种</th><th>手数</th><th>占比</th></tr></thead>
+                    <tbody id="risk-concentration-body"><tr><td colspan="3">加载中…</td></tr></tbody>
+                </table>
+                <p class="risk-note">数据来自 GET /api/risk/status；勾选「CTP 真实资金」时风险度 = (当前+冻结保证金)/动态权益，开仓前校验可用资金。</p>
+            </div>
+            <div class="risk-divider"></div>
+            <div class="risk-section">
+                <div class="risk-section-title">指标阈值与实时统计</div>
+                <div class="risk-row">
+                    <span class="risk-label">报单笔数：</span>
+                    <input type="number" class="risk-th" id="risk-order-th" value="0" min="0">
+                    <button type="button" class="btn-save" data-risk-save="order">保存阈值</button>
+                    <span class="risk-stat">当前：<em id="risk-order-cur">0</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-order-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">报撤单笔数：</span>
+                    <input type="number" class="risk-th" id="risk-oc-th" value="0" min="0">
+                    <button type="button" class="btn-save" data-risk-save="oc">保存阈值</button>
+                    <span class="risk-stat">当前：<em id="risk-oc-cur">0</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-oc-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">重复报单笔数：</span>
+                    <input type="number" class="risk-th" id="risk-dup-th" value="0" min="0">
+                    <button type="button" class="btn-save" data-risk-save="dup">保存阈值</button>
+                    <span class="risk-stat">当前：<em id="risk-dup-cur">0</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-dup-ban">0</em></span>
+                </div>
+                <p class="risk-note">说明：阈值为 0 表示不启用该项限制。报撤单笔数 = 报单笔数 + 撤单单笔数。</p>
+            </div>
+
+            <div class="risk-divider"></div>
+
+            <div class="risk-section">
+                <div class="risk-section-title">交易频率与会话 / 延迟</div>
+                <div class="risk-row">
+                    <span class="risk-label">令牌桶（笔/秒）：</span>
+                    <input type="number" class="risk-th" id="risk-freq-per-sec-th" value="15" min="1">
+                    <span class="risk-label">突发：</span>
+                    <input type="number" class="risk-th" id="risk-freq-burst-th" value="30" min="1">
+                    <button type="button" class="btn-save" data-risk-save="freq">保存阈值</button>
+                    <span class="risk-stat">当前：<em id="risk-freq-cur">—</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-freq-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">断连自动重连间隔（毫秒）：</span>
+                    <input type="number" class="risk-th" id="risk-reconnect-ms-th" value="0" min="0">
+                    <button type="button" class="btn-save" data-risk-save="session_reconnect">保存阈值</button>
+                    <span class="risk-stat">会话：<em id="risk-sess-cur">—</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-sess-ban">—</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">RTT 上限（毫秒）：</span>
+                    <input type="number" class="risk-th" id="risk-rtt-ms-th" value="500" min="0">
+                    <span class="risk-label">触发后暂停（秒）：</span>
+                    <input type="number" class="risk-th" id="risk-latency-pause-sec" value="60" min="0">
+                    <button type="button" class="btn-save" data-risk-save="latency">保存阈值</button>
+                    <span class="risk-stat">当前：<em id="risk-lat-cur">—</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-lat-ban">0</em></span>
+                </div>
+                <p class="risk-note">说明：断连间隔为 0 时不自动安排重连；RTT 与暂停由 LatencyRiskMgr 与网关回报样本驱动。</p>
+            </div>
+
+            <div class="risk-divider"></div>
+
+            <div class="risk-section">
+                <div class="risk-section-title">指令校验（统计）</div>
+                <div class="risk-row">
+                    <span class="risk-label">本地参数校验拒单：</span>
+                    <span class="risk-stat">禁止：<em id="risk-validate-ban">0</em></span>
+                    <button type="button" class="btn-query">查询快照</button>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">频控拒单（令牌桶）：</span>
+                    <span class="risk-stat">禁止：<em id="risk-ctp-ban">0</em></span>
+                    <button type="button" class="btn-query">查询快照</button>
+                </div>
+                <p class="risk-note">说明：阈值为 0 表示不启用该项限制。</p>
+            </div>
+
+            <div class="risk-divider"></div>
+
+            <div class="risk-section">
+                <div class="risk-section-title">限额与异常（统计）</div>
+                <div class="risk-row">
+                    <span class="risk-label">日亏损上限：</span>
+                    <input type="number" class="risk-th" id="risk-max-daily-loss-th" value="0" min="0" step="1">
+                    <span class="risk-label">净持仓上限：</span>
+                    <input type="number" class="risk-th" id="risk-max-net-th" value="1000" min="0">
+                    <span class="risk-label">最大风险度(%)：</span>
+                    <input type="number" class="risk-th" id="risk-max-risk-degree-th" value="85" min="0" max="100">
+                    <label class="risk-stat"><input type="checkbox" id="risk-block-touch"> 涨跌停附近禁止报单</label>
+                    <button type="button" class="btn-save" data-risk-save="risk_limit">保存阈值</button>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">应急拒单：</span>
+                    <span class="risk-stat">当前：<em id="risk-em-cur">—</em></span>
+                    <span class="risk-stat">禁止：<em id="risk-em-ban">0</em></span>
+                    <button type="button" class="btn-query">查询快照</button>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">流动性（占位）：</span>
+                    <span class="risk-stat">禁止：<em id="risk-liq-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">涨跌停/限额拒单：</span>
+                    <span class="risk-stat">禁止：<em id="risk-zdt-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">重复指纹拒单：</span>
+                    <span class="risk-stat">禁止：<em id="risk-contract-ban">0</em></span>
+                </div>
+                <div class="risk-row">
+                    <span class="risk-label">限额引擎合计拒单：</span>
+                    <span class="risk-stat">禁止：<em id="risk-limit-ban">0</em></span>
+                </div>
+                <p class="risk-note">说明：日亏损上限为 0 时不启用；最大风险度基于 CTP 保证金/权益；净持仓与涨跌停选项写入 Risk.json。</p>
+            </div>
+
+            <div class="risk-divider"></div>
+
+            <div class="risk-section">
+                <div class="risk-section-title">应急与 RTT 暂停</div>
+                <div class="risk-row">
+                    <button type="button" class="btn-save" id="risk-btn-emergency-pause">停单+停策略（应急）</button>
+                    <button type="button" class="btn-save" id="risk-btn-emergency-flatten">紧急平仓</button>
+                    <button type="button" class="btn-save" id="risk-btn-emergency-reset">解除应急</button>
+                    <button type="button" class="btn-save" id="risk-btn-latency-clear">清除 RTT 暂停</button>
+                </div>
+            </div>
+
+            <div class="risk-divider"></div>
+
+            <div class="risk-section">
+                <div class="risk-section-title">止盈止损</div>
+                <div class="risk-row-sl">
+                    <span>固定止盈：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0" title="次数">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>移动止损：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>固定止损：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>止损次数：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>止盈次数：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>单日止损：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <div class="risk-row-sl">
+                    <span>单日止盈：</span>
+                    <button type="button" class="btn-save">保存阈值</button>
+                    <input type="number" class="risk-th" value="0" min="0">
+                    <span class="risk-stat">当前：<em>0</em></span>
+                    <input type="number" class="risk-th sl-count" value="0" min="0">
+                    <select class="sl-state"><option>状态</option><option>正常</option><option>触发</option></select>
+                </div>
+                <p class="risk-note">说明：阈值为 0 表示不启用该项限制。</p>
+            </div>
+        </div>
+        <div class="risk-log-panel logger-embed-panel page-log-side">
+            <div class="risk-log-title">📋 运行日志</div>
+            <iframe class="logger-embed-frame" data-log-id="risk-run-log" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+
+    </div>
+    <script src="logger_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script src="risk_Bridge.js"></script>
+    <script>
+        function pct(v) {
+            return (Number(v || 0) * 100).toFixed(1) + '%';
+        }
+
+        function setText(id, text, cls) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text;
+            el.className = 'value' + (cls ? ' ' + cls : '');
+        }
+
+        function renderRiskStatus(data) {
+            if (!data) return;
+            var risk = data.risk || {};
+            var tc = data.time_check || {};
+            var rt = data.runtime || {};
+            var rejects = risk.reject_counts || {};
+
+            setText('risk-live-session', tc.in_session ? (tc.phase || '交易中') : '非交易时段',
+                tc.in_session ? 'risk-ok' : 'risk-bad');
+            setText('risk-live-degree', pct(rt.risk_degree), (rt.risk_degree || 0) > (risk.max_risk_degree || 1) ? 'risk-bad' : 'risk-ok');
+            setText('risk-live-rate', (rt.orders_last_minute != null ? rt.orders_last_minute : '—') + ' / ' + (risk.order_rate_limit_per_minute || '—'));
+
+            var srcEl = document.getElementById('risk-capital-source');
+            if (srcEl) {
+                srcEl.textContent = rt.capital_source === 'ctp' ? 'CTP' : 'CTA 估算';
+                srcEl.className = rt.capital_source === 'ctp' ? 'risk-ok' : '';
+            }
+            var useCtp = document.getElementById('risk-use-ctp');
+            if (useCtp && risk.use_ctp_account != null) useCtp.checked = !!risk.use_ctp_account;
+            if (rt.capital_source === 'ctp') {
+                setText('risk-live-balance', rt.ctp_balance != null ? Number(rt.ctp_balance).toFixed(0) : '—');
+                setText('risk-live-available', rt.ctp_available != null ? Number(rt.ctp_available).toFixed(0) : '—');
+                setText('risk-live-margin', rt.ctp_margin != null ? Number(rt.ctp_margin).toFixed(0) : '—');
+            } else {
+                setText('risk-live-balance', '—');
+                setText('risk-live-available', '—');
+                setText('risk-live-margin', rt.estimated_margin != null ? Number(rt.estimated_margin).toFixed(0) : '—');
+            }
+
+            var haltEl = document.getElementById('risk-live-halt');
+            if (haltEl) {
+                haltEl.textContent = risk.halt_all_orders ? '已开启' : '关闭';
+                haltEl.className = risk.halt_all_orders ? 'risk-bad' : 'risk-ok';
+            }
+            var stratHaltEl = document.getElementById('risk-live-strategy-halt');
+            if (stratHaltEl) {
+                stratHaltEl.textContent = risk.halt_all_strategies ? '已暂停' : '正常';
+                stratHaltEl.className = risk.halt_all_strategies ? 'risk-bad' : 'risk-ok';
+            }
+            var lotsEl = document.getElementById('risk-live-lots');
+            if (lotsEl) lotsEl.textContent = rt.total_lots != null ? rt.total_lots : '—';
+            var netEl = document.getElementById('risk-live-net');
+            if (netEl) netEl.textContent = rt.net_lots != null ? rt.net_lots : '—';
+
+            var reconnectTh = document.getElementById('risk-reconnect-ms-th');
+            if (reconnectTh && risk.session_reconnect_interval_ms != null) {
+                reconnectTh.value = risk.session_reconnect_interval_ms;
+            }
+            var sessCur = document.getElementById('risk-sess-cur');
+            if (sessCur && data.reconnect) {
+                var rc = data.reconnect;
+                var parts = [];
+                if (rc.md_watch) parts.push('Md#' + (rc.md_attempts || 0));
+                if (rc.td_watch) parts.push('Td#' + (rc.td_attempts || 0));
+                sessCur.textContent = rc.enabled ? (parts.join(' ') || '监听中') : '未启用';
+            }
+            var orderTh = document.getElementById('risk-order-th');
+            if (orderTh && risk.order_rate_limit_per_minute != null) orderTh.value = risk.order_rate_limit_per_minute;
+            var ocTh = document.getElementById('risk-oc-th');
+            if (ocTh && risk.order_cancel_limit_per_minute != null) ocTh.value = risk.order_cancel_limit_per_minute;
+            var dupTh = document.getElementById('risk-dup-th');
+            if (dupTh && risk.duplicate_order_limit_per_minute != null) dupTh.value = risk.duplicate_order_limit_per_minute;
+            var freqPerSec = document.getElementById('risk-freq-per-sec-th');
+            if (freqPerSec && risk.order_rate_per_sec != null) freqPerSec.value = risk.order_rate_per_sec;
+            var freqBurst = document.getElementById('risk-freq-burst-th');
+            if (freqBurst && risk.order_burst != null) freqBurst.value = risk.order_burst;
+            var rttTh = document.getElementById('risk-rtt-ms-th');
+            if (rttTh && risk.max_rtt_ms != null) rttTh.value = risk.max_rtt_ms;
+            var latPause = document.getElementById('risk-latency-pause-sec');
+            if (latPause && risk.latency_pause_sec != null) latPause.value = risk.latency_pause_sec;
+
+            var freqCur = document.getElementById('risk-freq-cur');
+            if (freqCur) {
+                var bucket = rt.token_bucket_tokens != null ? Number(rt.token_bucket_tokens).toFixed(1) : '—';
+                freqCur.textContent = bucket;
+            }
+            var orderCur = document.getElementById('risk-order-cur');
+            if (orderCur) orderCur.textContent = rt.orders_last_minute != null ? rt.orders_last_minute : '0';
+            var orderBan = document.getElementById('risk-order-ban');
+            if (orderBan) orderBan.textContent = rejects.rate || 0;
+            var ocCur = document.getElementById('risk-oc-cur');
+            if (ocCur) ocCur.textContent = rt.actions_last_minute != null ? rt.actions_last_minute : '0';
+            var ocBan = document.getElementById('risk-oc-ban');
+            if (ocBan) ocBan.textContent = rejects.order_cancel || 0;
+            var dupBan = document.getElementById('risk-dup-ban');
+            if (dupBan) dupBan.textContent = rejects.duplicate || 0;
+            var freqBan = document.getElementById('risk-freq-ban');
+            if (freqBan) freqBan.textContent = (rejects.token_bucket || 0) + (rejects.interval || 0);
+            var latCur = document.getElementById('risk-lat-cur');
+            if (latCur) {
+                var rttText = (rt.last_rtt_ms != null ? rt.last_rtt_ms : risk.last_rtt_ms) || '—';
+                latCur.textContent = (rt.latency_paused || risk.latency_paused) ? (rttText + 'ms 暂停') : (rttText + 'ms');
+            }
+            var latBan = document.getElementById('risk-lat-ban');
+            if (latBan) latBan.textContent = rejects.latency || 0;
+            var ctpBan = document.getElementById('risk-ctp-ban');
+            if (ctpBan) ctpBan.textContent = (rejects.token_bucket || 0) + (rejects.rate || 0);
+            var emCur = document.getElementById('risk-em-cur');
+            if (emCur) emCur.textContent = risk.halt_all_orders ? '停单中' : '正常';
+            var emBan = document.getElementById('risk-em-ban');
+            if (emBan) emBan.textContent = rejects.halt || 0;
+            var validateBan = document.getElementById('risk-validate-ban');
+            if (validateBan) validateBan.textContent = rejects.validate || 0;
+            var limitBan = document.getElementById('risk-limit-ban');
+            if (limitBan) {
+                var total = 0;
+                Object.keys(rejects).forEach(function (k) { total += rejects[k] || 0; });
+                limitBan.textContent = total;
+            }
+            var zdtBan = document.getElementById('risk-zdt-ban');
+            if (zdtBan) zdtBan.textContent = rejects.limit_touch || 0;
+            var contractBan = document.getElementById('risk-contract-ban');
+            if (contractBan) contractBan.textContent = rejects.duplicate || 0;
+            var netTh = document.getElementById('risk-max-net-th');
+            if (netTh && risk.max_net_position != null) netTh.value = risk.max_net_position;
+            var dailyLossTh = document.getElementById('risk-max-daily-loss-th');
+            if (dailyLossTh && risk.max_daily_loss != null) dailyLossTh.value = risk.max_daily_loss;
+            var riskDegTh = document.getElementById('risk-max-risk-degree-th');
+            if (riskDegTh && risk.max_risk_degree != null) riskDegTh.value = Math.round(risk.max_risk_degree * 100);
+            var blockTouch = document.getElementById('risk-block-touch');
+            if (blockTouch && risk.block_limit_touch != null) blockTouch.checked = !!risk.block_limit_touch;
+
+            var tbody = document.getElementById('risk-concentration-body');
+            var rows = rt.concentration || [];
+            if (!tbody) return;
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="3">暂无持仓</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(function (r) {
+                return '<tr><td>' + (r.product || '—') + '</td><td>' + (r.lots || 0) +
+                    '</td><td>' + pct(r.ratio) + '</td></tr>';
+            }).join('');
+        }
+
+        function refreshRiskStatus() {
+            if (!window.QuantSevBridge || !QuantSevBridge.Risk) return;
+            QuantSevBridge.Risk.getStatus().then(renderRiskStatus).catch(function (err) {
+                var tbody = document.getElementById('risk-concentration-body');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="3">加载失败: ' + err.message + '</td></tr>';
+            });
+        }
+
+        document.getElementById('risk-refresh-btn').addEventListener('click', refreshRiskStatus);
+        document.querySelectorAll('.btn-query').forEach(function (btn) {
+            btn.addEventListener('click', refreshRiskStatus);
+        });
+
+        document.getElementById('risk-btn-emergency-pause').addEventListener('click', function () {
+            if (!confirm('确认应急：停单 + 停止全部策略？')) return;
+            QuantSevBridge.Risk.triggerEmergency({ halt: true, stop_strategies: true, flatten: false })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.getElementById('risk-btn-emergency-flatten').addEventListener('click', function () {
+            if (!confirm('确认紧急平仓？将对手价平掉 CTA 账本全部持仓。')) return;
+            QuantSevBridge.Risk.triggerEmergency({ halt: true, stop_strategies: true, flatten: true })
+                .then(function (res) {
+                    var flat = res && res.flatten;
+                    var msg = '急平提交: 成功 ' + ((flat && flat.success_count) || 0) +
+                        ' / 失败 ' + ((flat && flat.fail_count) || 0);
+                    alert(msg);
+                    refreshRiskStatus();
+                }).catch(function (e) { alert(e.message); });
+        });
+        document.getElementById('risk-btn-emergency-reset').addEventListener('click', function () {
+            QuantSevBridge.Risk.triggerEmergency({ reset: true })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.getElementById('risk-btn-latency-clear').addEventListener('click', function () {
+            QuantSevBridge.Risk.clearLatencyPause()
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+
+        document.querySelector('[data-risk-save="session_reconnect"]').addEventListener('click', function () {
+            var val = Number(document.getElementById('risk-reconnect-ms-th').value || 0);
+            QuantSevBridge.Risk.saveConfig({ session_reconnect_interval_ms: val })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="order"]').addEventListener('click', function () {
+            var val = Number(document.getElementById('risk-order-th').value || 0);
+            QuantSevBridge.Risk.saveConfig({ order_rate_limit: val }).then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="oc"]').addEventListener('click', function () {
+            var val = Number(document.getElementById('risk-oc-th').value || 0);
+            QuantSevBridge.Risk.saveConfig({ order_cancel_limit: val }).then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="dup"]').addEventListener('click', function () {
+            var val = Number(document.getElementById('risk-dup-th').value || 0);
+            QuantSevBridge.Risk.saveConfig({ duplicate_order_limit: val }).then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="freq"]').addEventListener('click', function () {
+            var rate = Number(document.getElementById('risk-freq-per-sec-th').value || 0);
+            var burst = Number(document.getElementById('risk-freq-burst-th').value || 0);
+            QuantSevBridge.Risk.saveConfig({ order_rate_per_sec: rate, order_burst: burst })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="latency"]').addEventListener('click', function () {
+            var rtt = Number(document.getElementById('risk-rtt-ms-th').value || 0);
+            var pause = Number(document.getElementById('risk-latency-pause-sec').value || 0);
+            QuantSevBridge.Risk.saveConfig({ max_rtt_ms: rtt, latency_pause_sec: pause })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="use_ctp"]').addEventListener('click', function () {
+            var checked = document.getElementById('risk-use-ctp').checked;
+            QuantSevBridge.Risk.saveConfig({ use_ctp_account: checked })
+                .then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+        document.querySelector('[data-risk-save="risk_limit"]').addEventListener('click', function () {
+            var net = Number(document.getElementById('risk-max-net-th').value || 0);
+            var dailyLoss = Number(document.getElementById('risk-max-daily-loss-th').value || 0);
+            var deg = Number(document.getElementById('risk-max-risk-degree-th').value || 0) / 100;
+            var blockTouch = document.getElementById('risk-block-touch').checked;
+            QuantSevBridge.Risk.saveConfig({
+                max_net_position: net,
+                max_daily_loss: dailyLoss,
+                max_risk_degree: deg,
+                block_limit_touch: blockTouch
+            }).then(refreshRiskStatus).catch(function (e) { alert(e.message); });
+        });
+
+        refreshRiskStatus();
+        setInterval(refreshRiskStatus, 5000);
+    </script>
+</body>
+</html>

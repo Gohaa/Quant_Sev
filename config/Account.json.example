@@ -1,0 +1,15 @@
+{
+  "accounts": [
+    {
+      "name": "SimNow",
+      "user_id": "YOUR_USER_ID",
+      "broker_id": "9999",
+      "md_front": "tcp://180.168.146.187:10131",
+      "trader_front": "tcp://180.168.146.187:10130",
+      "password": "YOUR_PASSWORD",
+      "app_id": "simnow_client_test",
+      "auth_code": "0000000000000000",
+      "enabled": true
+    }
+  ]
+}

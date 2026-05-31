@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易控件</title>
+    <link rel="stylesheet" href="../common.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            font-size: 12px;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            height: auto;
+            overflow-y: auto;
+        }
+
+        .trade-control-container {
+            padding: 6px 6px 4px;
+        }
+
+        .panel-section {
+            margin-bottom: 6px;
+        }
+
+        .panel-section:last-child,
+        .panel-section--submit {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 10px;
+            color: #3498db;
+            font-weight: 600;
+            margin-bottom: 4px;
+            padding-bottom: 2px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 6px;
+        }
+
+        .form-group--compact {
+            margin-bottom: 4px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 10px;
+            color: #95a5a6;
+            margin-bottom: 2px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 5px 8px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 5px 8px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .direction-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .direction-btn {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .direction-btn.buy {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+            border-color: rgba(231, 76, 60, 0.3);
+        }
+
+        .direction-btn.buy:hover {
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+
+        .direction-btn.buy.active {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .direction-btn.sell {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+            border-color: rgba(46, 204, 113, 0.3);
+        }
+
+        .direction-btn.sell:hover {
+            background-color: rgba(46, 204, 113, 0.2);
+        }
+
+        .direction-btn.sell.active {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .offset-btns {
+            display: flex;
+            gap: 4px;
+        }
+
+        .offset-btn {
+            padding: 4px 8px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 2px;
+            color: #95a5a6;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .offset-btn:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .offset-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .order-type-btns {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .order-type-btn {
+            padding: 4px 8px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 2px;
+            color: #95a5a6;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .order-type-btn:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .order-type-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 6px 8px;
+            margin: 0;
+            background-color: #3498db;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            line-height: 1.2;
+        }
+
+        .submit-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .account-info {
+            background-color: rgba(52, 152, 219, 0.1);
+            border-radius: 3px;
+            padding: 6px;
+            margin-bottom: 8px;
+        }
+
+        .account-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin-bottom: 2px;
+        }
+
+        .account-label {
+            color: #95a5a6;
+        }
+
+        .account-value {
+            color: #e0e0e0;
+        }
+
+        .account-value.positive {
+            color: #e74c3c;
+        }
+
+        .account-value.negative {
+            color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="trade-control-container">
+        <div class="account-info">
+            <div class="account-row">
+                <span class="account-label">账户</span>
+                <span class="account-value" id="control-acct-user">—</span>
+            </div>
+            <div class="account-row">
+                <span class="account-label">可用资金</span>
+                <span class="account-value" id="control-acct-available">—</span>
+            </div>
+            <div class="account-row">
+                <span class="account-label">持仓盈亏</span>
+                <span class="account-value" id="control-acct-pnl">—</span>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">合约选择</div>
+            <div class="form-group">
+                <select class="form-select" id="contract-select">
+                    <option value="RB2410">RB2410 螺纹钢</option>
+                    <option value="HC2410">HC2410 热卷</option>
+                    <option value="IF2406">IF2406 沪深300</option>
+                    <option value="IC2406">IC2406 中证500</option>
+                    <option value="IH2406">IH2406 上证50</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">买卖方向</div>
+            <div class="direction-btns">
+                <button class="direction-btn buy active" id="buy-btn">买入开仓</button>
+                <button class="direction-btn sell" id="sell-btn">卖出开仓</button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">开平标志</div>
+            <div class="offset-btns">
+                <button class="offset-btn active" data-offset="open">开仓</button>
+                <button class="offset-btn" data-offset="close">平仓</button>
+                <button class="offset-btn" data-offset="close-today">平今</button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">委托类型</div>
+            <div class="order-type-btns">
+                <button class="order-type-btn active" data-type="limit">限价</button>
+                <button class="order-type-btn" data-type="market">市价</button>
+                <button class="order-type-btn" data-type="opponent">对手价</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">委托价格</label>
+                <input type="number" class="form-input" id="order-price" value="3656" step="1">
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">委托数量</div>
+            <div class="form-group form-group--compact">
+                <input type="number" class="form-input" id="order-volume" value="1" min="1" step="1">
+            </div>
+            <button class="submit-btn" id="submit-order">提交委托</button>
+        </div>
+    </div>
+
+    <script>
+        let currentDirection = 'buy';
+        let currentOffset = 'open';
+        let currentOrderType = 'limit';
+
+        function bridge() {
+            try { return window.parent.QuantSevBridge; } catch (e) { return null; }
+        }
+
+        function setControlText(id, text) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = text;
+        }
+
+        function setControlMoney(id, value) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (value == null || isNaN(Number(value))) {
+                el.textContent = '—';
+                return;
+            }
+            el.textContent = '¥' + Number(value).toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function setControlPnl(value) {
+            var el = document.getElementById('control-acct-pnl');
+            if (!el) return;
+            el.classList.remove('positive', 'negative');
+            if (value == null || isNaN(Number(value))) {
+                el.textContent = '—';
+                return;
+            }
+            var n = Number(value);
+            el.textContent = (n >= 0 ? '+' : '') + '¥' + n.toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            if (n > 0) el.classList.add('positive');
+            if (n < 0) el.classList.add('negative');
+        }
+
+        function refreshControlAccount(refresh) {
+            var b = bridge();
+            if (!b || !b.Trade || !b.Trade.queryTradingAccount) {
+                setControlText('control-acct-user', 'Bridge 未加载');
+                return Promise.resolve();
+            }
+            var uid = b.Trade.resolveUserId();
+            if (!uid) {
+                setControlText('control-acct-user', '未连接');
+                setControlText('control-acct-available', '—');
+                setControlPnl(null);
+                return Promise.resolve();
+            }
+            return b.Trade.queryTradingAccount({ user_id: uid, refresh: !!refresh })
+                .then(function (data) {
+                    var acc = (data && data.account) || {};
+                    if (data && data.error) {
+                        setControlText('control-acct-user', uid);
+                        return;
+                    }
+                    if (!data.cached && !acc.balance) {
+                        setControlText('control-acct-user', uid + ' (无缓存)');
+                        setControlText('control-acct-available', '—');
+                        setControlPnl(null);
+                        return;
+                    }
+                    setControlText('control-acct-user', acc.account_id || uid);
+                    setControlMoney('control-acct-available', acc.available);
+                    var pnl = acc.position_profit != null ? acc.position_profit : acc.close_profit;
+                    setControlPnl(pnl);
+                })
+                .catch(function () {
+                    setControlText('control-acct-user', uid);
+                });
+        }
+
+        document.getElementById('buy-btn').addEventListener('click', function() {
+            currentDirection = 'buy';
+            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            updateDirectionText();
+        });
+
+        document.getElementById('sell-btn').addEventListener('click', function() {
+            currentDirection = 'sell';
+            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            updateDirectionText();
+        });
+
+        function updateDirectionText() {
+            const buyBtn = document.getElementById('buy-btn');
+            const sellBtn = document.getElementById('sell-btn');
+            
+            if (currentOffset === 'open') {
+                buyBtn.textContent = '买入开仓';
+                sellBtn.textContent = '卖出开仓';
+            } else if (currentOffset === 'close') {
+                buyBtn.textContent = '买入平仓';
+                sellBtn.textContent = '卖出平仓';
+            } else if (currentOffset === 'close-today') {
+                buyBtn.textContent = '买入平今';
+                sellBtn.textContent = '卖出平今';
+            }
+        }
+
+        document.querySelectorAll('.offset-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                currentOffset = this.dataset.offset;
+                document.querySelectorAll('.offset-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                updateDirectionText();
+            });
+        });
+
+        document.querySelectorAll('.order-type-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                currentOrderType = this.dataset.type;
+                document.querySelectorAll('.order-type-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const priceInput = document.getElementById('order-price');
+                if (currentOrderType === 'market') {
+                    priceInput.disabled = true;
+                    priceInput.value = '';
+                } else if (currentOrderType === 'opponent') {
+                    priceInput.disabled = true;
+                    priceInput.value = currentDirection === 'buy' ? '对手买价' : '对手卖价';
+                } else {
+                    priceInput.disabled = false;
+                    priceInput.value = '';
+                }
+            });
+        });
+
+        document.getElementById('submit-order').addEventListener('click', function() {
+            const contract = document.getElementById('contract-select').value;
+            const priceRaw = document.getElementById('order-price').value;
+            const volume = parseInt(document.getElementById('order-volume').value, 10);
+            const b = bridge();
+            if (!b || !b.Trade) {
+                alert('交易 Bridge 未加载，请从主窗口打开交易页');
+                return;
+            }
+            const orderPayload = {
+                instrument_id: contract,
+                direction: currentDirection,
+                offset: currentOffset.replace(/-/g, '_'),
+                price_type: currentOrderType,
+                volume: volume
+            };
+            if (currentOrderType === 'limit') {
+                const price = parseFloat(priceRaw);
+                if (!price || price <= 0) {
+                    alert('请输入有效限价');
+                    return;
+                }
+                orderPayload.price = price;
+            } else {
+                orderPayload.price = 0;
+            }
+            const btn = document.getElementById('submit-order');
+            btn.disabled = true;
+            btn.textContent = '提交中…';
+            b.Trade.sendOrder(orderPayload)
+                .then(function(res) {
+                    if (res && res.ok) {
+                        alert('委托已提交\nOrderRef: ' + (res.order_ref || '—'));
+                        refreshControlAccount(false);
+                    } else {
+                        alert('报单失败: ' + ((res && (res.error || res.message)) || '未知错误'));
+                    }
+                })
+                .catch(function(err) {
+                    alert('报单失败: ' + (err.message || String(err)));
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = '提交委托';
+                });
+        });
+
+        function loadContractOptions() {
+            const select = document.getElementById('contract-select');
+            const b = bridge();
+            if (!b || !b.Logger || !b.Logger.Transport) return;
+            b.Logger.Transport.get('/api/symbols').then(function(data) {
+                const symbols = (data && data.symbols) || [];
+                if (!symbols.length) return;
+                select.innerHTML = symbols.map(function(s) {
+                    const id = s.instrument_id || '';
+                    const label = (s.name ? s.name + ' ' : '') + id;
+                    return '<option value="' + id + '">' + label + '</option>';
+                }).join('');
+            }).catch(function() { /* 保留默认选项 */ });
+        }
+        loadContractOptions();
+        refreshControlAccount(false);
+        setInterval(function () { refreshControlAccount(false); }, 15000);
+        try {
+            window.parent.addEventListener('quant-sev-trade', function () {
+                refreshControlAccount(false);
+            });
+        } catch (e) { /* ignore */ }
+
+        document.getElementById('contract-select').addEventListener('change', function() {
+            var contract = this.value;
+            try {
+                localStorage.setItem('quant_sev_chart_instrument', contract);
+                localStorage.setItem('quant_sev_last_contract', contract);
+            } catch (e) { /* ignore */ }
+            try {
+                window.parent.dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: contract }));
+            } catch (e) { /* ignore */ }
+        });
+
+        window.addEventListener('message', function (ev) {
+            var data = ev.data;
+            if (!data || data.type !== 'quant-sev-set-contract' || !data.instrument_id) return;
+            var select = document.getElementById('contract-select');
+            if (!select) return;
+            var id = String(data.instrument_id);
+            var found = false;
+            for (var i = 0; i < select.options.length; i++) {
+                if (select.options[i].value.toLowerCase() === id.toLowerCase()) {
+                    select.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id;
+                select.appendChild(opt);
+                select.value = id;
+            }
+        });
+
+        function syncIframeHeight() {
+            var h = document.documentElement.scrollHeight;
+            try {
+                window.parent.postMessage({
+                    type: 'quant-sev-iframe-resize',
+                    id: 'trade-control-frame-right',
+                    height: h
+                }, '*');
+            } catch (e) { /* ignore */ }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () {
+                syncIframeHeight();
+                refreshControlAccount(false);
+            });
+        } else {
+            syncIframeHeight();
+        }
+        window.addEventListener('resize', syncIframeHeight);
+    </script>
+</body>
+</html>

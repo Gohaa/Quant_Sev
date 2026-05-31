@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant_Sev - 期货量化交易系统</title>
+    <link rel="stylesheet" href="Mainwindow.css">
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <div class="title-bar">
+        <div class="title-left">
+            <div class="system-title">Quant_Sev</div>
+            <div class="connection-status">
+                <span class="status-item" id="quote-status">
+                    <span class="status-dot disconnected"></span>
+                    <span class="status-text">行情：未连接</span>
+                </span>
+                <span class="status-item" id="trade-status">
+                    <span class="status-dot disconnected"></span>
+                    <span class="status-text">交易：未连接</span>
+                </span>
+            </div>
+        </div>
+        <div class="title-center">
+            <div class="search-box">
+                <input type="text" placeholder="搜索合约..." id="search-input">
+                <button class="search-btn">🔍</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <!-- 左侧导航栏 -->
+        <div class="sidebar" id="sidebar">
+            <ul class="nav-menu">
+                <li class="nav-item active" data-page="Account_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/account.svg" alt="账户管理">
+                    <span class="nav-text">账户管理</span>
+                </li>
+                <li class="nav-item" data-page="Trade_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/trade.svg" alt="交易界面">
+                    <span class="nav-text">交易界面</span>
+                </li>
+                <li class="nav-item" data-page="Risk_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/risk.svg" alt="风险管理">
+                    <span class="nav-text">风险管理</span>
+                </li>
+                <li class="nav-item" data-page="Strategies_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/strategy.svg" alt="量化策略">
+                    <span class="nav-text">量化策略</span>
+                </li>
+                <li class="nav-item" data-page="FollowTrade_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/follow.svg" alt="跟单管理">
+                    <span class="nav-text">跟单管理</span>
+                </li>
+                <li class="nav-item" data-page="AI_Strategy_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/ai-strategy.svg" alt="AI策略+">
+                    <span class="nav-text">AI策略+</span>
+                </li>
+                <li class="nav-item" data-page="Backtest/Run.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/backtest.svg" alt="历史回测">
+                    <span class="nav-text">历史回测</span>
+                </li>
+                <li class="nav-item" data-page="Editor_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/editor.svg" alt="交易编写">
+                    <span class="nav-text">交易编写</span>
+                </li>
+                <li class="nav-item" data-page="Data_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/data.svg" alt="数据管理">
+                    <span class="nav-text">数据管理</span>
+                </li>
+                <li class="nav-item" data-page="Settings_ui.html" onclick="navigateTo(this)">
+                    <img class="nav-icon" src="icons/settings.svg" alt="设置">
+                    <span class="nav-text">设置</span>
+                </li>
+            </ul>
+            <div class="sidebar-toggle" onclick="toggleSidebar()">
+                <span id="toggle-icon">＜</span>
+            </div>
+        </div>
+
+        <!-- 右侧内容区 -->
+        <div class="content-area">
+            <iframe id="content-frame" src="Account_ui.html" frameborder="0"></iframe>
+        </div>
+    </div>
+
+    <script src="logger_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script>
+        // 页面导航功能
+        function navigateTo(element) {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+            const page = element.getAttribute('data-page');
+            const frame = document.getElementById('content-frame');
+            frame.onload = function () {
+                frame.onload = null;
+                try {
+                    var inst = localStorage.getItem('quant_sev_chart_instrument');
+                    if (inst && page === 'Trade_ui.html') {
+                        dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: inst }));
+                    }
+                } catch (e) { /* ignore */ }
+            };
+            frame.src = page;
+        }
+        window.navigateTo = navigateTo;
+
+        function jumpToTradeWithSymbol(symbol) {
+            var id = String(symbol || '').trim().toLowerCase();
+            if (!id) return;
+            try {
+                localStorage.setItem('quant_sev_chart_instrument', id);
+                localStorage.setItem('quant_sev_last_contract', id);
+            } catch (e) { /* ignore */ }
+            var nav = document.querySelector('[data-page="Trade_ui.html"]');
+            if (nav) navigateTo(nav);
+            else dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: id }));
+        }
+        window.jumpToTradeWithSymbol = jumpToTradeWithSymbol;
+
+        // 侧边栏折叠功能
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleIcon = document.getElementById('toggle-icon');
+            
+            sidebar.classList.toggle('collapsed');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.textContent = '＞';
+                // 隐藏文字，只显示图标
+                document.querySelectorAll('.nav-text').forEach(text => {
+                    text.style.display = 'none';
+                });
+            } else {
+                toggleIcon.textContent = '＜';
+                // 显示文字
+                document.querySelectorAll('.nav-text').forEach(text => {
+                    text.style.display = 'inline';
+                });
+            }
+        }
+
+        // 窗口控制功能（需要C++端实现）
+        function minimizeWindow() {
+            if (typeof UICore !== 'undefined' && UICore.minimizeWindow) {
+                UICore.minimizeWindow();
+            }
+        }
+
+        function maximizeWindow() {
+            if (typeof UICore !== 'undefined' && UICore.maximizeWindow) {
+                UICore.maximizeWindow();
+            }
+        }
+
+        function closeWindow() {
+            if (typeof UICore !== 'undefined' && UICore.closeWindow) {
+                UICore.closeWindow();
+            }
+        }
+
+        // 更新连接状态（由C++端调用）
+        function updateQuoteStatus(connected) {
+            const quoteStatus = document.getElementById('quote-status');
+            const dot = quoteStatus.querySelector('.status-dot');
+            const text = quoteStatus.querySelector('.status-text');
+            
+            if (connected) {
+                dot.classList.remove('disconnected');
+                dot.classList.add('connected');
+                text.textContent = '行情：已连接';
+            } else {
+                dot.classList.remove('connected');
+                dot.classList.add('disconnected');
+                text.textContent = '行情：未连接';
+            }
+        }
+
+        function updateTradeStatus(connected) {
+            const tradeStatus = document.getElementById('trade-status');
+            const dot = tradeStatus.querySelector('.status-dot');
+            const text = tradeStatus.querySelector('.status-text');
+            
+            if (connected) {
+                dot.classList.remove('disconnected');
+                dot.classList.add('connected');
+                text.textContent = '交易：已连接';
+            } else {
+                dot.classList.remove('connected');
+                dot.classList.add('disconnected');
+                text.textContent = '交易：未连接';
+            }
+        }
+
+        // 页面加载完成后初始化
+        function pollMainStatus() {
+            if (typeof QuantSevBridge === 'undefined' || !QuantSevBridge.Logger || !QuantSevBridge.Logger.Transport) return;
+            if (!QuantSevBridge.Logger.Transport.isHttp()) return;
+            QuantSevBridge.Logger.Transport.get('/api/status').then(function (st) {
+                updateQuoteStatus(!!st.md_ok);
+                updateTradeStatus(!!st.td_ok);
+            }).catch(function () {});
+        }
+
+        window.pollMainStatus = pollMainStatus;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('主界面加载完成');
+            pollMainStatus();
+            setInterval(pollMainStatus, 3000);
+            var searchInput = document.getElementById('search-input');
+            var searchBtn = document.querySelector('.search-btn');
+            function doSearch() {
+                if (!searchInput) return;
+                jumpToTradeWithSymbol(searchInput.value);
+            }
+            if (searchInput) {
+                searchInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') doSearch();
+                });
+            }
+            if (searchBtn) searchBtn.addEventListener('click', doSearch);
+            if (typeof UICore !== 'undefined' && UICore.onPageLoaded) {
+                UICore.onPageLoaded();
+            }
+        });
+    </script>
+</body>
+</html>

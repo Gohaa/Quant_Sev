@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史回测 · 参数优化</title>
+    <link rel="stylesheet" href="backtest.css">
+    <link rel="stylesheet" href="../logger_embed.css">
+</head>
+<body data-bt-page="optimize">
+    <div class="container">
+        <div class="panel">
+            <nav class="bt-subnav">
+                <a href="Run.html">▶️ 回测</a>
+                <a href="Optimize.html" class="active">🔧 参数优化</a>
+            </nav>
+            <div class="left-scroll">
+                <div class="form-group">
+                    <label class="form-label">标的（多合约用逗号分隔，逐合约优化）</label>
+                    <input type="text" id="bt-symbol" class="form-input" value="rb2610" placeholder="rb2610 或 rb2610,fg509">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">K线周期</label>
+                    <select id="bt-period" class="form-select">
+                        <option>1分钟</option><option>5分钟</option>
+                        <option selected>15分钟</option><option>1小时</option><option>日线</option>
+                    </select>
+                </div>
+                <div class="panel-title" style="margin-top:4px;">📦 合约参数</div>
+                <div class="form-group">
+                    <label class="form-label">合约乘数 / 最小变动</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="number" id="bt-multiplier" class="form-input" placeholder="自动" step="1">
+                        <input type="number" id="bt-tick" class="form-input" placeholder="自动" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">滑点（tick 数）</label>
+                    <input type="number" id="bt-slippage" class="form-input" value="0" min="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">手续费率 / 固定</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="number" id="bt-fee-rate" class="form-input" value="0.0001" step="0.00001">
+                        <input type="number" id="bt-fee-lot" class="form-input" value="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">保证金比例</label>
+                    <input type="number" id="bt-margin-rate" class="form-input" value="0.1" min="0" max="1" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">初始资金</label>
+                    <input type="number" id="bt-capital" class="form-input" value="1000000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回测日期（起）</label>
+                    <input type="date" id="bt-start-date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回测日期（止）</label>
+                    <input type="date" id="bt-end-date" class="form-input">
+                </div>
+                <div class="panel-title" style="margin-top:4px;">🔧 优化设置</div>
+                <div class="form-group">
+                    <label class="form-label">优化策略</label>
+                    <select id="bt-opt-strategy" class="form-select">
+                        <option value="">加载中…</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">优化目标</label>
+                    <select id="bt-opt-metric" class="form-select">
+                        <option value="total_return">总收益率（最大化）</option>
+                        <option value="win_rate">胜率（最大化）</option>
+                        <option value="min_drawdown">最大回撤（最小化）</option>
+                    </select>
+                </div>
+                <div class="panel-title" style="margin-top:4px;">📐 Input 优化范围</div>
+                <div class="scroll-box" style="max-height:220px;margin-bottom:6px;">
+                    <table class="data-table opt-grid-table">
+                        <thead>
+                            <tr><th>参数</th><th>开始</th><th>步长</th><th>终值</th><th>优化</th></tr>
+                        </thead>
+                        <tbody id="bt-opt-params-body">
+                            <tr><td colspan="5">选择策略后加载 input…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn" id="bt-opt-run-btn" type="button" style="background:#9b59b6;">🚀 开始参数优化</button>
+                <p class="hint">多合约将逐品种独立优化；右侧可切换查看各合约结果与汇总最优。</p>
+            </div>
+        </div>
+
+        <div class="center-panel panel">
+            <div class="view-tabs">
+                <button type="button" class="view-tab-btn active" data-view="opt-symbol">单合约优化结果</button>
+                <button type="button" class="view-tab-btn" data-view="opt-best">多合约最优汇总</button>
+            </div>
+
+            <div id="bt-view-opt-symbol" class="view-panel active">
+                <div class="symbol-pager" id="bt-opt-symbol-pager">
+                    <button type="button" class="symbol-pager-btn" id="bt-opt-symbol-prev">◀ 上一品种</button>
+                    <span class="symbol-pager-label" id="bt-opt-symbol-label">—</span>
+                    <button type="button" class="symbol-pager-btn" id="bt-opt-symbol-next">下一品种 ▶</button>
+                </div>
+                <div class="panel-title">📊 参数组合排名</div>
+                <div id="bt-opt-summary" class="hint" style="margin-bottom:8px;">配置左侧参数后点击开始</div>
+                <div class="scroll-box" style="flex:1;">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>#</th><th>参数</th><th>收益率</th><th>胜率</th><th>回撤</th><th>交易数</th></tr>
+                        </thead>
+                        <tbody id="bt-opt-body"><tr><td colspan="6">等待优化</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="bt-view-opt-best" class="view-panel">
+                <div class="panel-title">🏆 各合约最优参数</div>
+                <div id="bt-opt-best-summary" class="hint" style="margin-bottom:8px;">多合约优化完成后显示每个品种的最优组合</div>
+                <div class="scroll-box" style="flex:1;">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>#</th><th>品种</th><th>最优参数</th><th>收益率</th><th>胜率</th><th>回撤</th><th>交易数</th></tr>
+                        </thead>
+                        <tbody id="bt-opt-best-body"><tr><td colspan="7">等待优化</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 回测日志</div>
+            <iframe class="logger-embed-frame" src="../Logger.html?embed=1" title="回测日志"></iframe>
+        </div>
+    </div>
+
+    <script src="../logger_Bridge.js"></script>
+    <script src="../diagnostic_Bridge.js"></script>
+    <script src="../Backtest_Bridge.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) QuantSevBridge.Logger.autoInitPage();
+            if (window.QuantSevBridge && QuantSevBridge.Backtest) QuantSevBridge.Backtest.initPage('optimize');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "order_rate_limit": 20,
+  "min_order_interval_sec": 1,
+  "order_cancel_limit": 0,
+  "duplicate_order_limit": 0,
+  "order_rate_per_sec": 15,
+  "order_burst": 30,
+  "max_rtt_ms": 500,
+  "latency_pause_sec": 60,
+  "max_daily_loss": 0,
+  "block_limit_touch": false,
+  "max_risk_degree": 0.85,
+  "max_product_concentration": 0.6,
+  "initial_capital": 1000000,
+  "contract_multiplier": 10,
+  "margin_rate": 0.1,
+  "session_reconnect_interval_ms": 5000,
+  "max_net_position": 200,
+  "use_ctp_account": true,
+  "max_position": {
+    "default": 100
+  },
+  "allow_manual_outside_session": false,
+  "trading_sessions": [
+    { "label": "day_am1", "start": "09:00:00", "end": "10:15:00" },
+    { "label": "day_am2", "start": "10:30:00", "end": "11:30:00" },
+    { "label": "day_pm", "start": "13:30:00", "end": "15:00:00" },
+    { "label": "night", "start": "21:00:00", "end": "23:00:00" }
+  ],
+  "emergency": {
+    "halt_all_orders": false,
+    "halt_all_strategies": false,
+    "auto_flatten": false
+  }
+}

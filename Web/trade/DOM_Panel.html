@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>盘口深度</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .dom-container { padding: 6px; }
+        .dom-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-bottom: 6px;
+            color: #3498db;
+        }
+        .dom-last { color: #f39c12; }
+        .dom-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .dom-table th {
+            padding: 4px 6px;
+            text-align: left;
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        .dom-table td {
+            padding: 3px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .dom-ask { color: #e74c3c; }
+        .dom-bid { color: #2ecc71; }
+        .dom-spread-row {
+            background-color: rgba(0, 0, 0, 0.3);
+            text-align: center;
+            font-size: 10px;
+            color: #f39c12;
+        }
+        .dom-bar {
+            display: inline-block;
+            height: 10px;
+            margin-left: 4px;
+            border-radius: 2px;
+            vertical-align: middle;
+        }
+        .dom-bar-ask { background-color: rgba(231, 76, 60, 0.35); }
+        .dom-bar-bid { background-color: rgba(46, 204, 113, 0.35); }
+        .dom-footer {
+            margin-top: 6px;
+            font-size: 10px;
+            color: #95a5a6;
+            text-align: center;
+        }
+        .dom-empty {
+            padding: 20px;
+            text-align: center;
+            color: #95a5a6;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="dom-content" class="dom-container">
+        <div class="dom-empty">连接行情后显示五档盘口…</div>
+    </div>
+    <script src="../logger_Bridge.js"></script>
+    <script src="../orderbook_Bridge.js"></script>
+    <script src="../tick_Bridge.js"></script>
+    <script src="DOM_Panel.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) {
+                QuantSevBridge.Logger.autoInitPage();
+            }
+            window.domPanelInstance = new DOMPanel('dom-content');
+            window.domPanelInstance.init();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 260px;
+            gap: 12px;
+            height: 100%;
+            padding: 12px;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+            flex-shrink: 0;
+        }
+
+        .main-scroll {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .status-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 18px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            background: rgba(52, 152, 219, 0.08);
+            border: 1px solid rgba(52, 152, 219, 0.25);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .status-ok { color: #2ecc71; font-weight: 600; }
+        .status-off { color: #e74c3c; font-weight: 600; }
+        .status-muted { color: #95a5a6; }
+
+        #data-summary-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 11px;
+            color: #95a5a6;
+            margin-bottom: 8px;
+        }
+
+        #data-summary-bar b { color: #e0e0e0; }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .btn-primary { background: #3498db; color: #fff; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #2ecc71; color: #fff; }
+        .btn-success:hover { background: #27ae60; }
+        .btn-warning { background: #f39c12; color: #fff; }
+        .btn-info { background: #7f8c8d; color: #fff; }
+
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .filter-row select, .filter-row input {
+            padding: 5px 8px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .subscribe-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .subscribe-row input {
+            flex: 1;
+            min-width: 120px;
+            padding: 5px 8px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .sub-panel {
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .rollover-panel {
+            background: rgba(52, 152, 219, 0.08);
+            border: 1px solid rgba(52, 152, 219, 0.35);
+        }
+
+        .bar-verify-panel {
+            background: rgba(46, 204, 113, 0.06);
+            border: 1px solid rgba(46, 204, 113, 0.35);
+        }
+
+        .sub-panel .panel-title {
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .data-table thead {
+            background: rgba(52, 152, 219, 0.12);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .data-table th {
+            padding: 6px 5px;
+            text-align: left;
+            font-weight: 600;
+            color: #3498db;
+            border-bottom: 1px solid #3498db;
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 6px 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .data-table tbody tr.data-file-row {
+            cursor: pointer;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        #data-files-body tr.selected td {
+            background: rgba(52, 152, 219, 0.22);
+        }
+
+        .path-cell {
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #95a5a6;
+            font-size: 10px;
+        }
+
+        .action-btn {
+            padding: 4px 10px;
+            margin: 0 2px;
+            border: none;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .action-btn.view { background: rgba(52, 152, 219, 0.25); color: #3498db; }
+        .action-btn.import { background: rgba(243, 156, 18, 0.22); color: #f39c12; }
+        .action-btn.delete { background: rgba(231, 76, 60, 0.22); color: #e74c3c; }
+        .action-btn.export { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+
+        .data-browser-toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        #data-breadcrumb {
+            flex: 1;
+            min-width: 200px;
+            font-size: 11px;
+            color: #3498db;
+            padding: 4px 0;
+        }
+
+        .data-tree-browser {
+            display: grid;
+            grid-template-columns: 110px 130px 90px minmax(220px, 1fr);
+            gap: 0;
+            min-height: 260px;
+            max-height: 340px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .tree-col {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            background: rgba(0,0,0,0.15);
+        }
+
+        .tree-col:last-child { border-right: none; }
+
+        .tree-col-head {
+            padding: 6px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #3498db;
+            background: rgba(52, 152, 219, 0.12);
+            border-bottom: 1px solid rgba(52, 152, 219, 0.25);
+            flex-shrink: 0;
+        }
+
+        .tree-col-head--with-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            flex-wrap: wrap;
+            padding: 4px 6px;
+            color: #3498db;
+            background: rgba(52, 152, 219, 0.12);
+            border-bottom: 1px solid rgba(52, 152, 219, 0.25);
+        }
+
+        .tree-col-head--with-actions > span:first-child {
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .head-actions {
+            display: flex;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+
+        .head-actions .action-btn {
+            padding: 2px 6px;
+            font-size: 10px;
+            margin: 0;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .file-row .file-meta {
+            float: right;
+            color: #95a5a6;
+            font-size: 10px;
+            font-weight: normal;
+        }
+
+        .tree-col-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .tree-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 6px 8px;
+            margin-bottom: 2px;
+            border: none;
+            border-radius: 4px;
+            background: transparent;
+            color: #e0e0e0;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .tree-item:hover { background: rgba(52, 152, 219, 0.12); }
+        .tree-item.active {
+            background: rgba(52, 152, 219, 0.28);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .tree-count {
+            float: right;
+            color: #95a5a6;
+            font-size: 10px;
+        }
+
+        .tree-empty {
+            padding: 12px 8px;
+            color: #95a5a6;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .month-card {
+            padding: 8px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            cursor: pointer;
+        }
+
+        .month-card:hover { border-color: rgba(52, 152, 219, 0.35); }
+        .month-card.active {
+            border-color: #3498db;
+            background: rgba(52, 152, 219, 0.15);
+        }
+
+        .month-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: baseline;
+            margin-bottom: 4px;
+        }
+
+        .month-slot { font-weight: 600; color: #3498db; }
+        .month-inst { color: #e0e0e0; font-size: 11px; }
+        .month-name { color: #95a5a6; font-size: 10px; }
+
+        .month-meta, .month-path {
+            font-size: 10px;
+            color: #95a5a6;
+            line-height: 1.5;
+            margin-bottom: 4px;
+        }
+
+        .month-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+        .data-access-hint {
+            font-size: 10px;
+            color: #f39c12;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        #data-import-file { display: none; }
+
+        .detail-wrap {
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px;
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .selected-path {
+            font-size: 10px;
+            color: #95a5a6;
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+
+        .rollover-note { color: #95a5a6; margin-top: 6px; line-height: 1.5; }
+        .badge-confirmed { color: #2ecc71; font-weight: 600; }
+        .badge-intraday { color: #f39c12; font-weight: 600; }
+
+        .bar-verify-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .bar-verify-row input, .bar-verify-row select {
+            padding: 4px 8px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .bar-verify-result { color: #95a5a6; line-height: 1.6; font-size: 11px; }
+        .bar-verify-ok { color: #2ecc71; font-weight: 600; }
+        .bar-verify-fail { color: #e74c3c; font-weight: 600; }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <div class="panel-title">💾 数据管理 · Storage</div>
+
+            <div id="data-status-bar" class="status-bar">
+                <span class="status-muted">连接状态加载中…</span>
+            </div>
+
+            <div class="main-scroll">
+                <div class="subscribe-row">
+                    <input type="text" id="data-subscribe-input" placeholder="订阅合约（逗号分隔，如 rb2610,au2610）">
+                    <button type="button" class="btn btn-primary" id="data-subscribe-btn">订阅行情</button>
+                </div>
+
+                <div class="sub-panel rollover-panel">
+                    <div class="panel-title">🔄 换月管理</div>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary" id="rollover-refresh-btn">刷新建议</button>
+                        <button type="button" class="btn btn-warning" id="rollover-snapshot-btn">日终快照</button>
+                        <button type="button" class="btn btn-info" id="rollover-daily-btn">日终记录</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>状态</th><th>品种</th><th>当前</th><th>建议</th>
+                                <th>连续日</th><th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rollover-suggest-body">
+                            <tr><td colspan="6">点击「刷新建议」</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="rollover-note">confirmed = 连续 N 日日终 vol+OI 次月领先；需订阅当前+次月合约。</p>
+                </div>
+
+                <div class="sub-panel bar-verify-panel">
+                    <div class="panel-title">📐 Bar 对齐验证</div>
+                    <div class="bar-verify-row">
+                        <input type="text" id="bar-verify-inst" placeholder="合约 rb2610" value="rb2610" style="width:100px;">
+                        <select id="bar-verify-period">
+                            <option value="m1">m1</option>
+                            <option value="m15">m15</option>
+                            <option value="h1">h1</option>
+                            <option value="d1">d1</option>
+                        </select>
+                        <button type="button" class="btn btn-success" id="bar-verify-btn">Storage 验证</button>
+                        <button type="button" class="btn btn-primary" id="backtest-verify-btn">回测对齐</button>
+                    </div>
+                    <div id="bar-verify-result" class="bar-verify-result">验证 Storage CSV 与 API 尾行一致性</div>
+                </div>
+
+                <div class="panel-title" style="margin-top:4px;">📁 本地数据浏览</div>
+                <div id="data-access-hint" class="data-access-hint"></div>
+                <div class="data-browser-toolbar">
+                    <input type="text" id="data-filter-keyword" placeholder="筛选合约/品种/交易所" style="width:160px;padding:5px 8px;background:#2b2b2b;border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#e0e0e0;font-size:11px;">
+                    <span id="data-file-count" style="color:#95a5a6;font-size:11px;">—</span>
+                    <button type="button" class="btn btn-info" id="data-refresh-btn">刷新</button>
+                    <div id="data-breadcrumb">请选择交易所</div>
+                </div>
+                <div id="data-summary-bar"></div>
+
+                <div class="data-tree-browser">
+                    <div class="tree-col">
+                        <div class="tree-col-head">① 交易所</div>
+                        <div class="tree-col-body" id="data-col-exchange"><div class="tree-empty">加载中…</div></div>
+                    </div>
+                    <div class="tree-col">
+                        <div class="tree-col-head">② 品种</div>
+                        <div class="tree-col-body" id="data-col-product"><div class="tree-empty">—</div></div>
+                    </div>
+                    <div class="tree-col">
+                        <div class="tree-col-head">③ 月份合约</div>
+                        <div class="tree-col-body" id="data-col-month"><div class="tree-empty">—</div></div>
+                    </div>
+                    <div class="tree-col">
+                        <div class="tree-col-head tree-col-head--with-actions">
+                            <span>④ 周期 · 操作</span>
+                            <span class="head-actions">
+                                <button type="button" class="action-btn view" id="data-file-view-btn" disabled>查看</button>
+                                <button type="button" class="action-btn import" id="data-file-import-btn" disabled>导入</button>
+                                <button type="button" class="action-btn delete" id="data-file-delete-btn" disabled>删除</button>
+                            </span>
+                        </div>
+                        <div class="tree-col-body" id="data-col-files"><div class="tree-empty">—</div></div>
+                    </div>
+                </div>
+                <input type="file" id="data-import-file" accept=".csv,text/csv">
+
+                <div id="data-detail-section">
+                <div class="panel-title" id="data-detail-title">📊 数据详情（末 30 条）</div>
+                <div id="data-selected-path" class="selected-path">选中文件后显示 Storage 路径</div>
+                <div class="detail-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>开/价</th>
+                                <th>高</th>
+                                <th>低</th>
+                                <th>收</th>
+                                <th>成交量</th>
+                                <th>成交额</th>
+                                <th>持仓</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-detail-body">
+                            <tr><td colspan="8">点击「查看」预览 Bar / Tick 末 30 条</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 运行日志</div>
+            <iframe class="logger-embed-frame" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+    </div>
+
+    <script src="logger_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="Data_Bridge.js"></script>
+    <script src="rollover_Bridge.js"></script>
+    <script src="diagnostic_Bridge.js"></script>
+    <script>
+        function renderRolloverRows(data) {
+            var tbody = document.getElementById('rollover-suggest-body');
+            if (!tbody) return;
+            var confirmed = (data && data.confirmed_candidates) || [];
+            var intraday = (data && data.intraday_candidates) || [];
+            var rows = confirmed.concat(intraday);
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6">暂无换月建议</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(function (r) {
+                var cls = r.confirmed ? 'badge-confirmed' : 'badge-intraday';
+                var label = r.confirmed ? '已确认' : '即时';
+                return '<tr><td class="' + cls + '">' + label + '</td><td>' + (r.name || r.product || '—') +
+                    '</td><td>' + (r.current_instrument_id || '—') + '</td><td>' + (r.suggested_instrument_id || '—') +
+                    '</td><td>' + (r.consecutive_leading_days != null ? r.consecutive_leading_days : '—') + '/' +
+                    (r.policy_consecutive_days || '—') + '</td><td>' +
+                    (r.confirmed ? '<button type="button" class="action-btn export" data-apply="' + r.symbol_id +
+                    '" data-new="' + r.suggested_instrument_id + '">应用</button> ' : '') +
+                    '<button type="button" class="action-btn view" data-sub="' + (r.current_instrument_id || '') +
+                    '">订次月</button></td></tr>';
+            }).join('');
+            tbody.querySelectorAll('[data-apply]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    if (!confirm('确认换月并重新订阅？')) return;
+                    QuantSevBridge.Rollover.apply(Number(btn.getAttribute('data-apply')), btn.getAttribute('data-new'))
+                        .then(function () { alert('换月已应用'); refreshRollover(); })
+                        .catch(function (e) { alert(e.message); });
+                });
+            });
+            tbody.querySelectorAll('[data-sub]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var id = btn.getAttribute('data-sub');
+                    if (!id) return;
+                    QuantSevBridge.Rollover.subscribeNext(id).then(function () { alert('已订阅次月'); })
+                        .catch(function (e) { alert(e.message); });
+                });
+            });
+        }
+
+        function refreshRollover() {
+            if (!window.QuantSevBridge || !QuantSevBridge.Rollover) return;
+            QuantSevBridge.Rollover.getSuggest().then(renderRolloverRows).catch(function (e) {
+                var tbody = document.getElementById('rollover-suggest-body');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6">加载失败: ' + e.message + '</td></tr>';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) {
+                QuantSevBridge.Logger.autoInitPage();
+            }
+
+            refreshRollover();
+
+            var refreshBtn = document.getElementById('rollover-refresh-btn');
+            if (refreshBtn) refreshBtn.addEventListener('click', refreshRollover);
+
+            var snapBtn = document.getElementById('rollover-snapshot-btn');
+            if (snapBtn) snapBtn.addEventListener('click', function () {
+                QuantSevBridge.Rollover.snapshot().then(function (res) {
+                    alert('快照完成: written=' + (res.written || 0));
+                    refreshRollover();
+                }).catch(function (e) { alert(e.message); });
+            });
+
+            var dailyBtn = document.getElementById('rollover-daily-btn');
+            if (dailyBtn) dailyBtn.addEventListener('click', function () {
+                QuantSevBridge.Rollover.getDaily().then(function (res) {
+                    alert('日终记录 ' + (res.count || 0) + ' 条\n路径: ' + (res.store_path || ''));
+                }).catch(function (e) { alert(e.message); });
+            });
+
+            var barVerifyBtn = document.getElementById('bar-verify-btn');
+            if (barVerifyBtn) barVerifyBtn.addEventListener('click', function () {
+                var inst = (document.getElementById('bar-verify-inst') || {}).value || 'rb2610';
+                var period = (document.getElementById('bar-verify-period') || {}).value || 'm1';
+                var out = document.getElementById('bar-verify-result');
+                if (!window.QuantSevBridge || !QuantSevBridge.Diagnostic) {
+                    if (out) out.textContent = 'Diagnostic Bridge 未加载';
+                    return;
+                }
+                QuantSevBridge.Diagnostic.verifyBars(inst.trim(), period).then(function (res) {
+                    if (!out) return;
+                    var last = res.file_last || {};
+                    var lastText = last.date ? (last.date + ' ' + (last.time || '') + ' close=' + last.close) : '—';
+                    var cls = res.aligned ? 'bar-verify-ok' : 'bar-verify-fail';
+                    out.innerHTML = '<span class="' + cls + '">' + (res.aligned ? 'Storage 对齐 OK' : '未对齐') +
+                        '</span><br>路径: ' + (res.storage_path || '—') +
+                        '<br>文件 Bar 数: ' + (res.file_bar_count || 0) + ' | 末Bar: ' + lastText;
+                }).catch(function (e) {
+                    if (out) out.textContent = '验证失败: ' + e.message;
+                });
+            });
+
+            var backtestVerifyBtn = document.getElementById('backtest-verify-btn');
+            if (backtestVerifyBtn) backtestVerifyBtn.addEventListener('click', function () {
+                var inst = (document.getElementById('bar-verify-inst') || {}).value || 'rb2610';
+                var period = (document.getElementById('bar-verify-period') || {}).value || 'm1';
+                var out = document.getElementById('bar-verify-result');
+                if (!window.QuantSevBridge || !QuantSevBridge.Diagnostic) {
+                    if (out) out.textContent = 'Diagnostic Bridge 未加载';
+                    return;
+                }
+                QuantSevBridge.Diagnostic.verifyBacktestBars(inst.trim(), period).then(function (res) {
+                    if (!out) return;
+                    var cls = res.aligned ? 'bar-verify-ok' : 'bar-verify-fail';
+                    var fileLast = res.file_last || {};
+                    var btLast = res.backtest_last || {};
+                    out.innerHTML = '<span class="' + cls + '">' + (res.aligned ? '回测 Bar 对齐 OK' : '回测未对齐') +
+                        '</span>' + (res.fallback_m15 ? ' <span class="bar-verify-fail">(回退 m15)</span>' : '') +
+                        '<br>请求: ' + res.requested_period + ' → 实际: ' + res.resolved_period +
+                        '<br>Storage ' + (res.file_bar_count || 0) + ' 条 / 回测 ' + (res.backtest_bar_count || 0) + ' 条' +
+                        '<br>末Bar Storage: ' + (fileLast.date || '—') + ' | 回测: ' + (btLast.date || '—');
+                }).catch(function (e) {
+                    if (out) out.textContent = '回测验证失败: ' + e.message;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

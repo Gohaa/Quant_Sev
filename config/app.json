@@ -1,0 +1,14 @@
+{
+  "host": {
+    "http_port": 8080,
+    "ws_port": 8081,
+    "web_root": "Web",
+    "config_dir": "config"
+  },
+  "gateway": {
+    "version": "0.3.0-phase3"
+  },
+  "symbol": {
+    "auto_subscribe_all_on_md_connect": true
+  }
+}

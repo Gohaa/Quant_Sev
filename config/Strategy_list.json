@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "description": "CTA 资管策略定义；BLL/Strategy on_bar 驱动发信号。",
+  "strategies": [
+    {
+      "id": "demo_m15_dual",
+      "name": "M15 DualThrust",
+      "period": "m15",
+      "logic": "dual_thrust",
+      "default_instrument_id": "rb2610",
+      "default_volume": 1,
+      "min_interval_sec": 300,
+      "daily_limit": 10,
+      "days": 4,
+      "k1": 0.5,
+      "k2": 0.5,
+      "description": "DualThrust 突破策略（实盘 on_bar + 回测）"
+    },
+    {
+      "id": "demo_m1_ma",
+      "name": "M1 MA Cross",
+      "period": "m1",
+      "logic": "ma_cross",
+      "fast": 5,
+      "slow": 20,
+      "default_instrument_id": "rb2610",
+      "default_volume": 1,
+      "min_interval_sec": 60,
+      "daily_limit": 20,
+      "description": "m1 均线金叉/死叉策略（实盘 on_bar）"
+    },
+    {
+      "id": "demo_h1_trend",
+      "name": "H1趋势示例",
+      "period": "h1",
+      "logic": "dual_thrust",
+      "default_instrument_id": "au2610",
+      "default_volume": 1,
+      "min_interval_sec": 900,
+      "daily_limit": 8,
+      "days": 4,
+      "k1": 0.5,
+      "k2": 0.5,
+      "description": "h1 级 DualThrust 占位"
+    },
+    {
+      "id": "demo_d1_swing",
+      "name": "D1 DualThrust",
+      "period": "d1",
+      "logic": "dual_thrust",
+      "default_instrument_id": "rb2610",
+      "default_volume": 1,
+      "min_interval_sec": 3600,
+      "daily_limit": 2,
+      "days": 5,
+      "k1": 0.5,
+      "k2": 0.5,
+      "description": "d1 级 DualThrust 占位（联调 Bar 周期一致性）"
+    }
+  ]
+}

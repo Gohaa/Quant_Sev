@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行情图表</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="Market_Chart.css">
+</head>
+<body>
+    <div class="chart-container">
+        <div class="chart-toolbar">
+            <div class="toolbar-group">
+                <input type="text" class="toolbar-select" id="instrument-input" placeholder="合约 rb2610" style="width:100px;">
+            </div>
+            <div class="toolbar-group">
+                <select class="toolbar-select" id="timeframe-select">
+                    <option value="m1">1分钟</option>
+                    <option value="m15" selected>15分钟</option>
+                    <option value="h1">1小时</option>
+                    <option value="d1">日线</option>
+                </select>
+            </div>
+            <div class="toolbar-group indicator-picker" id="overlay-picker">
+                <span class="toolbar-label">主图叠加</span>
+                <button type="button" class="toolbar-btn indicator-picker-btn" id="overlay-picker-btn">选择指标</button>
+                <div class="indicator-picker-panel" id="overlay-picker-panel">
+                    <div class="indicator-picker-list" id="overlay-picker-list"></div>
+                </div>
+            </div>
+            <div class="toolbar-group indicator-picker" id="sub-picker">
+                <span class="toolbar-label">副图</span>
+                <button type="button" class="toolbar-btn indicator-picker-btn" id="sub-picker-btn">MACD</button>
+                <div class="indicator-picker-panel" id="sub-picker-panel">
+                    <div class="indicator-picker-list" id="sub-picker-list"></div>
+                </div>
+            </div>
+            <div class="toolbar-group">
+                <button class="toolbar-btn" data-sub="vol">VOL</button>
+            </div>
+            <div class="toolbar-group">
+                <button class="toolbar-btn" id="add-subpage-btn">+ 添加子页</button>
+                <button class="toolbar-btn" id="layout-btn">布局</button>
+                <button class="toolbar-btn" id="reset-layout-btn">重置</button>
+                <span id="chart-status" style="font-size:10px;color:#95a5a6;margin-left:8px;"></span>
+            </div>
+        </div>
+
+        <div class="chart-main">
+            <div class="subpage-container" id="subpage-container">
+                <div class="subpage-panel" id="main-chart-panel" style="flex: 50 1 0;">
+                    <div class="subpage-header">
+                        <span class="subpage-title">📈 主图 - K线</span>
+                        <div class="subpage-actions">
+                            <button class="subpage-action-btn" data-action="maximize">⛶</button>
+                            <button class="subpage-action-btn" data-action="settings">⚙</button>
+                        </div>
+                    </div>
+                    <div class="subpage-content">
+                        <div class="chart-wrapper" id="main-chart"></div>
+                    </div>
+                    <div class="resize-handle" data-panel="main-chart-panel"></div>
+                </div>
+
+                <div class="subpage-panel" id="sub-chart-macd" style="flex: 20 1 0;">
+                    <div class="subpage-header">
+                        <span class="subpage-title" id="sub-chart-title">📊 副图 - MACD</span>
+                        <div class="subpage-actions">
+                            <button class="subpage-action-btn" data-action="close">✕</button>
+                            <button class="subpage-action-btn" data-action="settings">⚙</button>
+                        </div>
+                    </div>
+                    <div class="subpage-content">
+                        <div class="chart-wrapper" id="macd-chart"></div>
+                    </div>
+                    <div class="resize-handle" data-panel="sub-chart-macd"></div>
+                </div>
+
+                <div class="subpage-panel" id="dom-panel" style="display: none;">
+                    <div class="subpage-header">
+                        <span class="subpage-title">📊 盘口深度</span>
+                        <div class="subpage-actions">
+                            <button class="subpage-action-btn" data-action="close">✕</button>
+                            <button class="subpage-action-btn" data-action="settings">⚙</button>
+                        </div>
+                    </div>
+                    <div class="subpage-content">
+                        <div class="dom-panel" id="dom-content"></div>
+                    </div>
+                    <div class="resize-handle" data-panel="dom-panel"></div>
+                </div>
+
+                <div class="subpage-panel" id="chip-panel" style="display: none;">
+                    <div class="subpage-header">
+                        <span class="subpage-title">📊 筹码分布</span>
+                        <div class="subpage-actions">
+                            <button class="subpage-action-btn" data-action="close">✕</button>
+                            <button class="subpage-action-btn" data-action="settings">⚙</button>
+                        </div>
+                    </div>
+                    <div class="subpage-content">
+                        <div class="chart-wrapper" id="chip-chart"></div>
+                    </div>
+                    <div class="resize-handle" data-panel="chip-panel"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="context-menu">
+        <div class="context-menu-item" data-action="add-main">添加主图指标</div>
+        <div class="context-menu-item" data-action="add-sub">添加副图指标</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" data-action="add-dom">添加盘口</div>
+        <div class="context-menu-item" data-action="add-chip">添加筹码分布</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" data-action="reset">重置布局</div>
+    </div>
+
+    <script src="Chart_Axis.js"></script>
+    <script src="Indicator_Catalog.js"></script>
+    <script src="Market_Chart.js"></script>
+    <script src="Indicator_Chart.js"></script>
+    <script src="Chip_Chart.js"></script>
+    <script src="DOM_Panel.js"></script>
+    <script src="Market_Chart_App.js"></script>
+</body>
+</html>

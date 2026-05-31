@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易查询</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            font-size: 12px;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .trade-query-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .query-tabs {
+            display: flex;
+            gap: 2px;
+            padding: 0 8px 4px;
+            background-color: #1e1e1e;
+            border-top: 1px solid rgba(52, 152, 219, 0.3);
+            flex-shrink: 0;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+        }
+
+        .query-tab {
+            padding: 4px 8px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-top: none;
+            border-radius: 0 0 3px 3px;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1.2;
+            white-space: nowrap;
+            flex-shrink: 0;
+            color: #95a5a6;
+            transition: all 0.2s;
+        }
+
+        .query-tab:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #e0e0e0;
+        }
+
+        .query-tab.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+            font-weight: 600;
+        }
+
+        .query-content {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            padding: 8px;
+        }
+
+        .query-panel {
+            display: none;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .query-panel.active {
+            display: block;
+        }
+
+        .query-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            table-layout: fixed;
+        }
+
+        .query-table th {
+            padding: 3px 4px;
+            text-align: left;
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            font-weight: 500;
+            font-size: 10px;
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .query-table td {
+            padding: 3px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .query-table tr:hover {
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        .status-pending {
+            color: #f39c12;
+        }
+
+        .status-filled {
+            color: #2ecc71;
+        }
+
+        .status-cancelled {
+            color: #95a5a6;
+        }
+
+        .direction-buy {
+            color: #e74c3c;
+        }
+
+        .direction-sell {
+            color: #2ecc71;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 3px;
+            color: #95a5a6;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #e0e0e0;
+        }
+
+        .action-btn.cancel {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-color: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+        }
+
+        .action-btn.cancel:hover {
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .query-table tr.selectable {
+            cursor: pointer;
+        }
+
+        .query-table tr.selected {
+            background-color: rgba(52, 152, 219, 0.22);
+        }
+
+        .profit-up {
+            color: #e74c3c;
+        }
+
+        .profit-down {
+            color: #2ecc71;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 6px 10px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .filter-input {
+            padding: 6px 10px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 11px;
+            width: 150px;
+        }
+
+        .refresh-btn {
+            padding: 6px 12px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 3px;
+            color: #3498db;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .summary-bar {
+            display: flex;
+            gap: 10px;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+            background-color: rgba(52, 152, 219, 0.05);
+            border-radius: 3px;
+            flex-wrap: wrap;
+            font-size: 10px;
+        }
+
+        .summary-item {
+            font-size: 10px;
+        }
+
+        .summary-label {
+            color: #95a5a6;
+        }
+
+        .summary-value {
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="trade-query-container">
+        <div class="query-content">
+            <div class="query-tabs">
+                <div class="query-tab active" data-panel="orders">委托</div>
+                <div class="query-tab" data-panel="pending">未成</div>
+                <div class="query-tab" data-panel="cancelled">撤单</div>
+                <div class="query-tab" data-panel="trades">成交</div>
+                <div class="query-tab" data-panel="positions">持仓</div>
+                <div class="query-tab" data-panel="history">历史</div>
+            </div>
+            <div class="query-panel active" id="orders-panel">
+                <div class="filter-bar">
+                    <select class="filter-select" id="order-status-filter">
+                        <option value="all">全部状态</option>
+                        <option value="pending">待成交</option>
+                        <option value="filled">已成交</option>
+                        <option value="cancelled">已撤单</option>
+                    </select>
+                    <input type="text" class="filter-input" id="order-contract-filter" placeholder="合约代码筛选">
+                    <button class="refresh-btn" id="orders-cancel-selected-btn" disabled>撤选中</button>
+                    <button class="refresh-btn" id="orders-refresh-btn">刷新</button>
+                </div>
+                <div class="summary-bar" id="orders-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">总委托:</span>
+                        <span class="summary-value" id="sum-total">0笔</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">待成交:</span>
+                        <span class="summary-value" id="sum-pending">0笔</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">已成交:</span>
+                        <span class="summary-value" id="sum-filled">0笔</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">已撤单:</span>
+                        <span class="summary-value" id="sum-cancelled">0笔</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead>
+                        <tr>
+                            <th>委托时间</th>
+                            <th>合约</th>
+                            <th>买卖</th>
+                            <th>开平</th>
+                            <th>委托价</th>
+                            <th>委托量</th>
+                            <th>成交量</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <tr><td colspan="9">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="query-panel" id="pending-panel">
+                <div class="filter-bar">
+                    <input type="text" class="filter-input" id="pending-contract-filter" placeholder="合约代码筛选">
+                    <button class="refresh-btn" id="pending-cancel-selected-btn" disabled>撤选中</button>
+                    <button class="refresh-btn" id="pending-refresh-btn">刷新</button>
+                </div>
+                <div class="summary-bar" id="pending-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">未成委托:</span>
+                        <span class="summary-value" id="pending-sum-count">0笔</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead>
+                        <tr>
+                            <th>委托时间</th>
+                            <th>合约</th>
+                            <th>买卖</th>
+                            <th>开平</th>
+                            <th>委托价</th>
+                            <th>委托量</th>
+                            <th>成交量</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-tbody">
+                        <tr><td colspan="9">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="query-panel" id="cancelled-panel">
+                <div class="filter-bar">
+                    <input type="text" class="filter-input" id="cancelled-contract-filter" placeholder="合约代码筛选">
+                    <button class="refresh-btn" id="cancelled-refresh-btn">刷新</button>
+                </div>
+                <div class="summary-bar" id="cancelled-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">已撤单:</span>
+                        <span class="summary-value" id="cancelled-sum-count">0笔</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead>
+                        <tr>
+                            <th>委托时间</th>
+                            <th>合约</th>
+                            <th>买卖</th>
+                            <th>开平</th>
+                            <th>委托价</th>
+                            <th>委托量</th>
+                            <th>成交量</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cancelled-tbody">
+                        <tr><td colspan="8">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="query-panel" id="trades-panel">
+                <div class="filter-bar">
+                    <input type="text" class="filter-input" id="trade-contract-filter" placeholder="合约代码筛选">
+                    <button class="refresh-btn" id="trades-refresh-btn">刷新</button>
+                </div>
+                <div class="summary-bar" id="trades-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">总成交:</span>
+                        <span class="summary-value" id="trade-sum-total">0笔</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">买入:</span>
+                        <span class="summary-value" id="trade-sum-buy">0笔</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">卖出:</span>
+                        <span class="summary-value" id="trade-sum-sell">0笔</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead>
+                        <tr>
+                            <th>成交时间</th>
+                            <th>合约</th>
+                            <th>买卖</th>
+                            <th>开平</th>
+                            <th>成交价</th>
+                            <th>成交量</th>
+                            <th>成交额</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-tbody">
+                        <tr><td colspan="7">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="query-panel" id="positions-panel">
+                <div class="filter-bar">
+                    <input type="text" class="filter-input" id="position-contract-filter" placeholder="合约代码筛选">
+                    <button class="refresh-btn" id="positions-refresh-btn">刷新</button>
+                </div>
+                <div class="summary-bar" id="positions-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">总持仓:</span>
+                        <span class="summary-value" id="pos-sum-contracts">0个合约</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">多头:</span>
+                        <span class="summary-value" id="pos-sum-long">0手</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">空头:</span>
+                        <span class="summary-value" id="pos-sum-short">0手</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead>
+                        <tr>
+                            <th>合约</th>
+                            <th>方向</th>
+                            <th>手数</th>
+                            <th>开仓价</th>
+                            <th>盈亏</th>
+                            <th>来源</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-tbody">
+                        <tr><td colspan="6">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="query-panel" id="history-panel">
+                <div class="filter-bar">
+                    <input type="date" class="filter-input" id="history-date-from">
+                    <input type="date" class="filter-input" id="history-date-to">
+                    <select class="filter-select" id="history-type-filter">
+                        <option value="orders">委托记录</option>
+                        <option value="trades">成交记录</option>
+                    </select>
+                    <label style="font-size:11px;color:#95a5a6;display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="history-refresh-ctp"> CTP 查询
+                    </label>
+                    <button class="refresh-btn" id="history-query-btn">查询</button>
+                </div>
+                <div class="summary-bar" id="history-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">结果:</span>
+                        <span class="summary-value" id="history-sum-count">0条</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">来源:</span>
+                        <span class="summary-value" id="history-sum-source">—</span>
+                    </div>
+                </div>
+                <table class="query-table">
+                    <thead id="history-thead">
+                        <tr>
+                            <th>日期</th>
+                            <th>时间</th>
+                            <th>合约</th>
+                            <th>买卖</th>
+                            <th>开平</th>
+                            <th>价格</th>
+                            <th>数量</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <tr><td colspan="8">选择日期后点击查询</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var ordersCache = [];
+        var tradesCache = [];
+        var positionsCtpSynced = false;
+        var selectedOrder = null;
+        var selectedPositionKey = null;
+
+        function bridge() {
+            try { return window.parent.QuantSevBridge; } catch (e) { return null; }
+        }
+
+        function formatLoadError(err) {
+            var msg = (err && err.message) ? err.message : String(err);
+            if (/not found/i.test(msg) && /\/api\/(trade|cta)/i.test(msg)) {
+                return msg + ' — 请用 quant_sev_host.exe 启动后端（旧版 Quant_Sev.exe 无交易查询 API）';
+            }
+            return msg;
+        }
+
+        function probeTradeApi() {
+            var b = bridge();
+            if (!b || !b.Logger || !b.Logger.Transport) return;
+            b.Logger.Transport.get('/api/status').then(function (st) {
+                var ok = st && (st.phase === '5' || st.api_version === 'phase5-full');
+                if (ok) return;
+                var hint = '后端版本过旧 (phase ' + ((st && st.phase) || '?') +
+                    ')，请运行 build-msvc\\bin\\Release\\quant_sev_host.exe 后刷新';
+                ['orders-tbody', 'trades-tbody', 'positions-tbody', 'pending-tbody', 'cancelled-tbody'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (!el) return;
+                    var col = id === 'positions-tbody' ? 6 : (id === 'trades-tbody' ? 7 : (id === 'cancelled-tbody' ? 8 : 9));
+                    if (/加载中/.test(el.textContent)) {
+                        el.innerHTML = '<tr><td colspan="' + col + '">' + hint + '</td></tr>';
+                    }
+                });
+            }).catch(function () { /* ignore */ });
+        }
+
+        function statusBucket(raw) {
+            var s = (raw || '').toLowerCase();
+            if (s === 'all_traded' || s === 'filled') return 'filled';
+            if (s === 'canceled' || s === 'cancelled' || s === 'rejected') return 'cancelled';
+            if (s === 'submitted' || s === 'no_trade' || s === 'part_traded' ||
+                s === 'not_touched' || s === 'touched' || s === 'unknown') return 'pending';
+            return 'pending';
+        }
+
+        function statusText(raw) {
+            var map = {
+                submitted: '已提交',
+                no_trade: '待成交',
+                part_traded: '部分成交',
+                all_traded: '全部成交',
+                canceled: '已撤单',
+                cancelled: '已撤单',
+                rejected: '已拒绝',
+                not_touched: '待触发',
+                touched: '已触发',
+                unknown: '未知'
+            };
+            return map[(raw || '').toLowerCase()] || raw || '—';
+        }
+
+        function statusClass(raw) {
+            var bucket = statusBucket(raw);
+            if (bucket === 'filled') return 'status-filled';
+            if (bucket === 'cancelled') return 'status-cancelled';
+            return 'status-pending';
+        }
+
+        function directionText(dir) {
+            return dir === 'sell' ? '卖出' : '买入';
+        }
+
+        function directionClass(dir) {
+            return dir === 'sell' ? 'direction-sell' : 'direction-buy';
+        }
+
+        function offsetText(offset) {
+            var o = (offset || 'open').replace(/_/g, '-');
+            if (o.indexOf('close') === 0) return '平仓';
+            return '开仓';
+        }
+
+        function formatTime(text) {
+            if (!text) return '—';
+            var parts = text.split(' ');
+            return parts.length > 1 ? parts[1] : text;
+        }
+
+        function canCancel(order) {
+            return statusBucket(order.status) === 'pending' && !!order.order_ref;
+        }
+
+        function mergeOrderRows(ctaOrders, tradeOrders) {
+            var map = {};
+            (ctaOrders || []).forEach(function (o) {
+                var key = o.order_ref || (o.instrument_id + '@' + o.created_at);
+                map[key] = Object.assign({}, o);
+            });
+            (tradeOrders || []).forEach(function (o) {
+                var key = o.order_ref || (o.instrument_id + '@' + o.update_time);
+                if (!map[key]) map[key] = {};
+                Object.assign(map[key], o, {
+                    volume: map[key].volume || o.volume_total,
+                    volume_traded: o.volume_traded != null ? o.volume_traded : map[key].volume_traded,
+                    price: map[key].price != null ? map[key].price : o.limit_price,
+                    created_at: map[key].created_at || o.insert_time || o.update_time
+                });
+            });
+            return Object.keys(map).map(function (k) { return map[k]; })
+                .sort(function (a, b) {
+                    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+                });
+        }
+
+        function filterOrders(orders, statusMode, contractInputId) {
+            var contractFilter = (document.getElementById(contractInputId).value || '').trim().toUpperCase();
+            return orders.filter(function (o) {
+                if (statusMode !== 'all' && statusBucket(o.status) !== statusMode) return false;
+                if (contractFilter && String(o.instrument_id || '').toUpperCase().indexOf(contractFilter) < 0) return false;
+                return true;
+            });
+        }
+
+        function applyFilters(orders) {
+            var statusFilter = document.getElementById('order-status-filter').value;
+            return filterOrders(orders, statusFilter, 'order-contract-filter');
+        }
+
+        function buildOrderRowHtml(o, showCancel) {
+            var cancellable = canCancel(o);
+            var cancelBtn = showCancel && cancellable
+                ? '<button class="action-btn cancel" data-ref="' + (o.order_ref || '') +
+                  '" data-inst="' + (o.instrument_id || '') +
+                  '" data-sys="' + (o.order_sys_id || '') + '">撤单</button>'
+                : '';
+            var actionCell = showCancel
+                ? '<td class="action-btns">' + cancelBtn + '</td>'
+                : '';
+            var rowClass = cancellable ? 'order-row selectable' : 'order-row';
+            if (selectedOrder && selectedOrder.order_ref && selectedOrder.order_ref === o.order_ref) {
+                rowClass += ' selected';
+            }
+            return '<tr class="' + rowClass + '" data-ref="' + (o.order_ref || '') +
+                '" data-inst="' + (o.instrument_id || '') +
+                '" data-sys="' + (o.order_sys_id || '') + '">' +
+                '<td>' + formatTime(o.created_at || o.insert_time) + '</td>' +
+                '<td>' + (o.instrument_id || '—') + '</td>' +
+                '<td class="' + directionClass(o.direction) + '">' + directionText(o.direction) + '</td>' +
+                '<td>' + offsetText(o.offset) + '</td>' +
+                '<td>' + (o.price != null ? Number(o.price) : (o.limit_price != null ? Number(o.limit_price) : '—')) + '</td>' +
+                '<td>' + (o.volume != null ? o.volume : (o.volume_total || 0)) + '</td>' +
+                '<td>' + (o.volume_traded != null ? o.volume_traded : 0) + '</td>' +
+                '<td class="' + statusClass(o.status) + '">' + statusText(o.status) + '</td>' +
+                actionCell + '</tr>';
+        }
+
+        function updateCancelSelectedButtons() {
+            var enabled = !!(selectedOrder && canCancel(selectedOrder));
+            ['orders-cancel-selected-btn', 'pending-cancel-selected-btn'].forEach(function (id) {
+                var btn = document.getElementById(id);
+                if (btn) btn.disabled = !enabled;
+            });
+        }
+
+        function findOrderByRef(ref) {
+            if (!ref) return null;
+            for (var i = 0; i < ordersCache.length; i++) {
+                if (ordersCache[i].order_ref === ref) return ordersCache[i];
+            }
+            return null;
+        }
+
+        function onOrderRowClick(ev) {
+            if (ev.target.closest('.action-btn')) return;
+            var ref = this.getAttribute('data-ref');
+            var order = findOrderByRef(ref);
+            if (!order || !canCancel(order)) return;
+            selectedOrder = order;
+            renderAllOrderPanels();
+        }
+
+        function cancelOrderRecord(order) {
+            if (!order || !canCancel(order)) {
+                alert('当前订单不可撤单');
+                return;
+            }
+            if (!confirm('确认撤单: ' + (order.instrument_id || '') + ' ?')) return;
+            var b = bridge();
+            if (!b || !b.Trade) {
+                alert('Trade Bridge 未加载');
+                return;
+            }
+            var payload = { instrument_id: order.instrument_id, order_ref: order.order_ref };
+            if (order.order_sys_id) payload.order_sys_id = order.order_sys_id;
+            b.Trade.cancelOrder(payload).then(function () {
+                alert('撤单请求已提交');
+                selectedOrder = null;
+                refreshOrders();
+            }).catch(function (err) {
+                alert('撤单失败: ' + err.message);
+            });
+        }
+
+        function renderOrderList(config) {
+            var tbody = document.getElementById(config.tbodyId);
+            if (!tbody) return;
+            var statusMode = config.statusMode;
+            if (statusMode === 'all') {
+                var statusFilterEl = document.getElementById('order-status-filter');
+                statusMode = statusFilterEl ? statusFilterEl.value : 'all';
+            }
+            var rows = filterOrders(ordersCache, statusMode, config.contractInputId);
+            if (config.summaryId) {
+                var sumEl = document.getElementById(config.summaryId);
+                if (sumEl) sumEl.textContent = rows.length + '笔';
+            }
+            var colSpan = config.showCancel ? 9 : 8;
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="' + colSpan + '">' + config.emptyText + '</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(function (o) {
+                return buildOrderRowHtml(o, !!config.showCancel);
+            }).join('');
+            if (config.showCancel) {
+                tbody.querySelectorAll('.action-btn.cancel').forEach(function (btn) {
+                    btn.addEventListener('click', onCancelClick);
+                });
+                tbody.querySelectorAll('tr.order-row.selectable').forEach(function (row) {
+                    row.addEventListener('click', onOrderRowClick);
+                });
+            }
+            updateCancelSelectedButtons();
+        }
+
+        function renderAllOrderPanels() {
+            renderOrderList({
+                tbodyId: 'orders-tbody',
+                statusMode: 'all',
+                contractInputId: 'order-contract-filter',
+                showCancel: true,
+                emptyText: '暂无委托'
+            });
+            renderOrderList({
+                tbodyId: 'pending-tbody',
+                statusMode: 'pending',
+                contractInputId: 'pending-contract-filter',
+                summaryId: 'pending-sum-count',
+                showCancel: true,
+                emptyText: '暂无未成委托'
+            });
+            renderOrderList({
+                tbodyId: 'cancelled-tbody',
+                statusMode: 'cancelled',
+                contractInputId: 'cancelled-contract-filter',
+                summaryId: 'cancelled-sum-count',
+                showCancel: false,
+                emptyText: '暂无撤单记录'
+            });
+            updateSummary(ordersCache);
+        }
+
+        function updateSummary(orders) {
+            var total = orders.length;
+            var pending = 0;
+            var filled = 0;
+            var cancelled = 0;
+            orders.forEach(function (o) {
+                var b = statusBucket(o.status);
+                if (b === 'pending') pending += 1;
+                else if (b === 'filled') filled += 1;
+                else if (b === 'cancelled') cancelled += 1;
+            });
+            document.getElementById('sum-total').textContent = total + '笔';
+            document.getElementById('sum-pending').textContent = pending + '笔';
+            document.getElementById('sum-filled').textContent = filled + '笔';
+            document.getElementById('sum-cancelled').textContent = cancelled + '笔';
+        }
+
+        function formatAmount(value) {
+            if (value == null || isNaN(value)) return '—';
+            return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+        }
+
+        function initHistoryDates() {
+            var toEl = document.getElementById('history-date-to');
+            var fromEl = document.getElementById('history-date-from');
+            if (!toEl || !fromEl) return;
+            var today = new Date();
+            var from = new Date(today.getTime() - 7 * 24 * 3600 * 1000);
+            function fmt(d) {
+                var m = d.getMonth() + 1;
+                var day = d.getDate();
+                return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+            }
+            toEl.value = fmt(today);
+            fromEl.value = fmt(from);
+        }
+
+        function renderHistoryRows(rows, type) {
+            var tbody = document.getElementById('history-tbody');
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="8">无历史记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(function (r) {
+                var statusCell = type === 'trades'
+                    ? '<td class="status-filled">已成交</td>'
+                    : '<td class="' + statusClass(r.status) + '">' + statusText(r.status) + '</td>';
+                return '<tr><td>' + (r.date || '—') + '</td>' +
+                    '<td>' + formatTime(r.time) + '</td>' +
+                    '<td>' + (r.instrument_id || '—') + '</td>' +
+                    '<td class="' + directionClass(r.direction) + '">' + directionText(r.direction) + '</td>' +
+                    '<td>' + offsetText(r.offset) + '</td>' +
+                    '<td>' + (r.price != null ? Number(r.price) : '—') + '</td>' +
+                    '<td>' + (r.volume != null ? r.volume : '—') + '</td>' +
+                    statusCell + '</tr>';
+            }).join('');
+        }
+
+        function refreshHistory() {
+            var b = bridge();
+            var tbody = document.getElementById('history-tbody');
+            if (!b || !b.Trade || !b.Trade.queryHistory) {
+                tbody.innerHTML = '<tr><td colspan="8">Bridge 未加载</td></tr>';
+                return;
+            }
+            var type = document.getElementById('history-type-filter').value || 'trades';
+            var dateFrom = document.getElementById('history-date-from').value || '';
+            var dateTo = document.getElementById('history-date-to').value || '';
+            var refreshCtp = document.getElementById('history-refresh-ctp').checked;
+            tbody.innerHTML = '<tr><td colspan="8">查询中…</td></tr>';
+            b.Trade.queryHistory({
+                type: type,
+                date_from: dateFrom,
+                date_to: dateTo,
+                refresh: refreshCtp,
+                limit: 500
+            }).then(function (data) {
+                var rows = (data && data.rows) || [];
+                document.getElementById('history-sum-count').textContent = rows.length + '条';
+                document.getElementById('history-sum-source').textContent =
+                    (data && data.source === 'ctp' ? 'CTP+缓存' : '本地缓存') +
+                    (data && data.ctp_message ? ' (' + data.ctp_message + ')' : '');
+                renderHistoryRows(rows, type);
+            }).catch(function (err) {
+                tbody.innerHTML = '<tr><td colspan="8">查询失败: ' + formatLoadError(err) + '</td></tr>';
+            });
+        }
+
+        function applyTradeFilters(trades) {
+            var contractFilter = (document.getElementById('trade-contract-filter').value || '').trim().toUpperCase();
+            return trades.filter(function (t) {
+                if (contractFilter && String(t.instrument_id || '').toUpperCase().indexOf(contractFilter) < 0) {
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateTradeSummary(trades) {
+            var buy = 0;
+            var sell = 0;
+            trades.forEach(function (t) {
+                if (t.direction === 'sell') sell += 1;
+                else buy += 1;
+            });
+            document.getElementById('trade-sum-total').textContent = trades.length + '笔';
+            document.getElementById('trade-sum-buy').textContent = buy + '笔';
+            document.getElementById('trade-sum-sell').textContent = sell + '笔';
+        }
+
+        function renderTrades() {
+            var tbody = document.getElementById('trades-tbody');
+            var rows = applyTradeFilters(tradesCache);
+            updateTradeSummary(tradesCache);
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="7">暂无成交</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(function (t) {
+                var turnover = t.turnover != null ? t.turnover : (Number(t.price || 0) * Number(t.volume || 0));
+                return '<tr data-trade-id="' + (t.trade_id || '') + '">' +
+                    '<td>' + formatTime(t.trade_time) + '</td>' +
+                    '<td>' + (t.instrument_id || '—') + '</td>' +
+                    '<td class="' + directionClass(t.direction) + '">' + directionText(t.direction) + '</td>' +
+                    '<td>' + offsetText(t.offset) + '</td>' +
+                    '<td>' + (t.price != null ? Number(t.price) : '—') + '</td>' +
+                    '<td>' + (t.volume != null ? t.volume : 0) + '</td>' +
+                    '<td>' + formatAmount(turnover) + '</td></tr>';
+            }).join('');
+        }
+
+        function refreshTrades() {
+            var b = bridge();
+            var tbody = document.getElementById('trades-tbody');
+            if (!b || !b.Trade || !b.Trade.listTradeTrades) {
+                tbody.innerHTML = '<tr><td colspan="7">Bridge 未加载（需在 Trade_ui 内打开）</td></tr>';
+                return;
+            }
+            b.Trade.listTradeTrades({ limit: 200 }).then(function (data) {
+                tradesCache = ((data && data.trades) || []).slice().sort(function (a, b) {
+                    var ta = (a.trade_date || '') + ' ' + (a.trade_time || '');
+                    var tb = (b.trade_date || '') + ' ' + (b.trade_time || '');
+                    return tb.localeCompare(ta);
+                });
+                renderTrades();
+            }).catch(function (err) {
+                tbody.innerHTML = '<tr><td colspan="7">加载失败: ' + formatLoadError(err) + '</td></tr>';
+            });
+        }
+
+        function onTradeUpdate(update) {
+            if (!update) {
+                refreshTrades();
+                return;
+            }
+            var tradeId = update.trade_id || '';
+            var found = false;
+            tradesCache = tradesCache.map(function (t) {
+                if (tradeId && t.trade_id === tradeId) {
+                    found = true;
+                    return Object.assign({}, t, update);
+                }
+                return t;
+            });
+            if (!found) {
+                tradesCache.unshift(update);
+            }
+            renderTrades();
+        }
+
+        function renderOrders() {
+            renderAllOrderPanels();
+        }
+
+        function setOrderPanelsError(message) {
+            var html = '<tr><td colspan="9">' + message + '</td></tr>';
+            var html8 = '<tr><td colspan="8">' + message + '</td></tr>';
+            var ordersTbody = document.getElementById('orders-tbody');
+            var pendingTbody = document.getElementById('pending-tbody');
+            var cancelledTbody = document.getElementById('cancelled-tbody');
+            if (ordersTbody) ordersTbody.innerHTML = html;
+            if (pendingTbody) pendingTbody.innerHTML = html;
+            if (cancelledTbody) cancelledTbody.innerHTML = html8;
+        }
+
+        function onCancelClick(ev) {
+            ev.stopPropagation();
+            var ref = this.getAttribute('data-ref');
+            var inst = this.getAttribute('data-inst');
+            var sys = this.getAttribute('data-sys');
+            var order = findOrderByRef(ref) || {
+                order_ref: ref,
+                instrument_id: inst,
+                order_sys_id: sys,
+                status: 'pending'
+            };
+            cancelOrderRecord(order);
+        }
+
+        function onCancelSelectedClick() {
+            cancelOrderRecord(selectedOrder);
+        }
+
+        function refreshOrders() {
+            var b = bridge();
+            if (!b || !b.Cta) {
+                setOrderPanelsError('Bridge 未加载（需在 Trade_ui 内打开）');
+                return;
+            }
+            setOrderPanelsError('加载中…');
+            var ctaPromise = b.Cta.getOrders(null, 200);
+            var tradePromise = (b.Trade && b.Trade.listTradeOrders)
+                ? b.Trade.listTradeOrders({ limit: 200 })
+                : Promise.resolve({ orders: [] });
+            Promise.allSettled([ctaPromise, tradePromise]).then(function (res) {
+                var ctaRes = res[0].status === 'fulfilled' ? res[0].value : { orders: [] };
+                var tradeRes = res[1].status === 'fulfilled' ? res[1].value : { orders: [] };
+                if (res[0].status === 'rejected' && res[1].status === 'rejected') {
+                    throw res[0].reason || res[1].reason;
+                }
+                ordersCache = mergeOrderRows(
+                    (ctaRes && ctaRes.orders) || [],
+                    (tradeRes && tradeRes.orders) || []
+                );
+                renderAllOrderPanels();
+            }).catch(function (err) {
+                setOrderPanelsError('加载失败: ' + formatLoadError(err));
+            });
+        }
+
+        function onOrderUpdate(update) {
+            if (!update || !update.order_ref) {
+                refreshOrders();
+                return;
+            }
+            var found = false;
+            ordersCache = ordersCache.map(function (o) {
+                if (o.order_ref === update.order_ref) {
+                    found = true;
+                    return Object.assign({}, o, update, {
+                        volume_traded: update.volume_traded != null ? update.volume_traded : o.volume_traded,
+                        price: o.price != null ? o.price : update.limit_price
+                    });
+                }
+                return o;
+            });
+            if (!found) {
+                ordersCache.unshift(update);
+            }
+            renderAllOrderPanels();
+        }
+
+        function loadPositionsData(refresh) {
+            var b = bridge();
+            if (!b || !b.Trade || !b.Trade.queryPositions) {
+                return Promise.reject(new Error('Trade Bridge 未加载'));
+            }
+            var uid = b.Trade.resolveUserId();
+            return b.Trade.queryPositions({ user_id: uid, refresh: !!refresh }).then(function (data) {
+                if (data && data.error) {
+                    return Promise.reject(new Error(data.error));
+                }
+                var positions = (data && data.positions) || [];
+                if (!positions.length && !refresh && uid && !positionsCtpSynced) {
+                    positionsCtpSynced = true;
+                    return b.Trade.queryPositions({ user_id: uid, refresh: true });
+                }
+                return data;
+            });
+        }
+
+        function positionLegKey(p) {
+            return String(p.instrument_id || '') + '|' + String(p.direction || '');
+        }
+
+        function directionLegText(direction) {
+            var d = String(direction || '').toLowerCase();
+            if (d === 'long' || d === 'buy') return '多';
+            if (d === 'short' || d === 'sell') return '空';
+            return direction || '—';
+        }
+
+        function directionLegClass(direction) {
+            var d = String(direction || '').toLowerCase();
+            if (d === 'long' || d === 'buy') return 'direction-buy';
+            if (d === 'short' || d === 'sell') return 'direction-sell';
+            return '';
+        }
+
+        function refreshPositions() {
+            var tbody = document.getElementById('positions-tbody');
+            loadPositionsData(false).then(function (data) {
+                var positions = (data && data.positions) || [];
+                var filter = (document.getElementById('position-contract-filter').value || '').trim().toUpperCase();
+                if (filter) {
+                    positions = positions.filter(function (p) {
+                        return String(p.instrument_id || '').toUpperCase().indexOf(filter) >= 0;
+                    });
+                }
+                var meta = (data && data.summary) || {};
+                var sourceLabel = (data && data.source === 'ctp') ? 'CTP 实时' : 'CTP 缓存';
+                document.getElementById('pos-sum-contracts').textContent = (meta.total_contracts || 0) + '个合约';
+                document.getElementById('pos-sum-long').textContent = (meta.total_long || 0) + '手';
+                document.getElementById('pos-sum-short').textContent = (meta.total_short || 0) + '手';
+                if (!positions.length) {
+                    selectedPositionKey = null;
+                    tbody.innerHTML = '<tr><td colspan="6">暂无持仓</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = positions.map(function (p) {
+                    var key = positionLegKey(p);
+                    var profit = Number(p.position_profit || 0);
+                    var profitClass = profit >= 0 ? 'profit-up' : 'profit-down';
+                    var selected = selectedPositionKey === key ? ' selected' : '';
+                    return '<tr class="position-row selectable' + selected + '" data-leg="' + key + '">' +
+                        '<td>' + (p.instrument_id || '—') + '</td>' +
+                        '<td class="' + directionLegClass(p.direction) + '">' + directionLegText(p.direction) + '</td>' +
+                        '<td>' + (p.volume || 0) + '</td>' +
+                        '<td>' + (p.open_price ? Number(p.open_price).toFixed(0) : '—') + '</td>' +
+                        '<td class="' + profitClass + '">' + (profit >= 0 ? '+' : '') + profit.toFixed(0) + '</td>' +
+                        '<td>' + sourceLabel + '</td></tr>';
+                }).join('');
+                tbody.querySelectorAll('tr.position-row.selectable').forEach(function (row) {
+                    row.addEventListener('click', function () {
+                        selectedPositionKey = row.getAttribute('data-leg');
+                        refreshPositions();
+                    });
+                });
+            }).catch(function (err) {
+                tbody.innerHTML = '<tr><td colspan="6">加载失败: ' + formatLoadError(err) + '</td></tr>';
+            });
+        }
+
+        document.querySelectorAll('.query-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.query-tab').forEach(function (t) { t.classList.remove('active'); });
+                document.querySelectorAll('.query-panel').forEach(function (p) { p.classList.remove('active'); });
+                this.classList.add('active');
+                document.getElementById(this.dataset.panel + '-panel').classList.add('active');
+                if (this.dataset.panel === 'positions') refreshPositions();
+                if (this.dataset.panel === 'trades') refreshTrades();
+                if (this.dataset.panel === 'history') refreshHistory();
+                if (this.dataset.panel === 'orders' || this.dataset.panel === 'pending' || this.dataset.panel === 'cancelled') {
+                    refreshOrders();
+                }
+            });
+        });
+
+        document.getElementById('orders-refresh-btn').addEventListener('click', refreshOrders);
+        document.getElementById('pending-refresh-btn').addEventListener('click', refreshOrders);
+        document.getElementById('cancelled-refresh-btn').addEventListener('click', refreshOrders);
+        document.getElementById('orders-cancel-selected-btn').addEventListener('click', onCancelSelectedClick);
+        document.getElementById('pending-cancel-selected-btn').addEventListener('click', onCancelSelectedClick);
+        document.getElementById('trades-refresh-btn').addEventListener('click', refreshTrades);
+        document.getElementById('positions-refresh-btn').addEventListener('click', refreshPositions);
+        document.getElementById('history-query-btn').addEventListener('click', refreshHistory);
+        document.getElementById('order-status-filter').addEventListener('change', renderAllOrderPanels);
+        document.getElementById('order-contract-filter').addEventListener('input', renderAllOrderPanels);
+        document.getElementById('pending-contract-filter').addEventListener('input', renderAllOrderPanels);
+        document.getElementById('cancelled-contract-filter').addEventListener('input', renderAllOrderPanels);
+        document.getElementById('trade-contract-filter').addEventListener('input', renderTrades);
+
+        refreshOrders();
+        refreshTrades();
+        refreshPositions();
+        initHistoryDates();
+        probeTradeApi();
+        setInterval(refreshOrders, 5000);
+        setInterval(refreshTrades, 5000);
+        setInterval(refreshPositions, 15000);
+
+        var b = bridge();
+        if (b && b.Tick && b.Tick.onOrder) {
+            b.Tick.onOrder(onOrderUpdate);
+        }
+        if (b && b.Tick && b.Tick.onTrade) {
+            b.Tick.onTrade(function (update) {
+                onTradeUpdate(update);
+                refreshPositions();
+            });
+        }
+    </script>
+</body>
+</html>

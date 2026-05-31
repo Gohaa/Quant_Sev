@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI策略+</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 15px;
+            height: 100%;
+            padding: 15px;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .ai-config {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .strategy-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .strategy-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .strategy-table thead {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .strategy-table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .strategy-table td {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .strategy-table tbody tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            background-color: #1a1a1a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 5px;
+            border-radius: 2px;
+        }
+
+        .log-time {
+            color: #95a5a6;
+            margin-right: 8px;
+        }
+
+        .log-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-right: 8px;
+            font-weight: 600;
+        }
+
+        .log-type.info {
+            background-color: rgba(52, 152, 219, 0.3);
+            color: #3498db;
+        }
+
+        .log-type.success {
+            background-color: rgba(46, 204, 113, 0.3);
+            color: #2ecc71;
+        }
+
+        .log-type.warning {
+            background-color: rgba(243, 156, 18, 0.3);
+            color: #f39c12;
+        }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+    <div class="panel">
+        <div class="panel-title">🧠 模型设置</div>
+        <div class="ai-config">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Base URL</label>
+                    <input type="text" class="form-input" placeholder="https://api.openai.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input type="password" class="form-input" placeholder="sk-...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">模型名称</label>
+                    <input type="text" class="form-input" placeholder="gpt-4">
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <button class="btn btn-primary">测试连接</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-title" style="margin-top: 20px;">📊 AI策略列表</div>
+        <div class="strategy-list">
+            <table class="strategy-table">
+                <thead>
+                    <tr>
+                        <th>策略名称</th>
+                        <th>周期</th>
+                        <th>操作</th>
+                        <th>状态</th>
+                        <th>IC系数</th>
+                        <th>关联账户</th>
+                        <th>关联合约</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>AI趋势预测</td>
+                        <td>1分钟</td>
+                        <td><button class="btn btn-success" style="padding: 4px 12px; font-size: 11px;">启动</button></td>
+                        <td style="color: #e74c3c;">已停止</td>
+                        <td>0.85</td>
+                        <td>SimNow</td>
+                        <td>IF2401</td>
+                    </tr>
+                    <tr>
+                        <td>AI均值回归</td>
+                        <td>5分钟</td>
+                        <td><button class="btn btn-success" style="padding: 4px 12px; font-size: 11px;">启动</button></td>
+                        <td style="color: #e74c3c;">已停止</td>
+                        <td>0.72</td>
+                        <td>SimNow</td>
+                        <td>IC2401</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 运行日志</div>
+            <iframe class="logger-embed-frame" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+
+    </div>
+</body>
+</html>

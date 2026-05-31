@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易编写</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 250px 1fr 280px;
+            gap: 15px;
+            height: 100%;
+            padding: 15px;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .strategy-tree {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tree-category {
+            margin-bottom: 10px;
+        }
+
+        .tree-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #3498db;
+        }
+
+        .tree-header:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .tree-icon {
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+
+        .tree-header.collapsed .tree-icon {
+            transform: rotate(-90deg);
+        }
+
+        .tree-items {
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .tree-header.collapsed + .tree-items {
+            display: none;
+        }
+
+        .tree-item {
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+
+        .tree-item:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .tree-item.active {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .editor-area {
+            flex: 1;
+            background-color: #1a1a1a;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-y: auto;
+            color: #e0e0e0;
+        }
+
+        .code-line {
+            display: block;
+            white-space: pre;
+        }
+
+        .code-keyword {
+            color: #569cd6;
+        }
+
+        .code-string {
+            color: #ce9178;
+        }
+
+        .code-comment {
+            color: #6a9955;
+        }
+
+        .code-function {
+            color: #dcdcaa;
+        }
+
+        .code-number {
+            color: #b5cea8;
+        }
+
+        .function-tree {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧：策略列表 -->
+        <div class="panel">
+            <div class="panel-title">📝 策略</div>
+            <div class="strategy-tree">
+                <div class="tree-category">
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>拓展示例</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">双均线策略</div>
+                        <div class="tree-item">MACD策略</div>
+                        <div class="tree-item">布林带策略</div>
+                        <div class="tree-item">网格交易</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>系统示例</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">示例_基础下单</div>
+                        <div class="tree-item">示例_条件单</div>
+                        <div class="tree-item">示例_止盈止损</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>用户策略</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item active">我的策略1</div>
+                        <div class="tree-item">我的策略2</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary">💾 保存</button>
+                <button class="btn btn-success">▶️ 编译</button>
+            </div>
+        </div>
+
+        <!-- 中间：代码编辑器 -->
+        <div class="panel">
+            <div class="panel-title">💻 代码编辑区域</div>
+            <div class="editor-area">
+<span class="code-line"><span class="code-comment">// 双均线策略示例</span></span>
+<span class="code-line"><span class="code-keyword">function</span> <span class="code-function">OnInit</span>() {</span>
+<span class="code-line">    <span class="code-comment">// 策略初始化</span></span>
+<span class="code-line">    <span class="code-function">SetBarInterval</span>(Enum_Period_Min(), <span class="code-number">1</span>);</span>
+<span class="code-line">    <span class="code-function">SubQuote</span>(<span class="code-string">"IF2401"</span>);</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">function</span> <span class="code-function">OnBar</span>() {</span>
+<span class="code-line">    <span class="code-keyword">var</span> ma5 = <span class="code-function">Average</span>(<span class="code-function">Close</span>(), <span class="code-number">5</span>);</span>
+<span class="code-line">    <span class="code-keyword">var</span> ma20 = <span class="code-function">Average</span>(<span class="code-function">Close</span>(), <span class="code-number">20</span>);</span>
+<span class="code-line"></span>
+<span class="code-line">    <span class="code-keyword">if</span> (<span class="code-function">CrossOver</span>(ma5, ma20)) {</span>
+<span class="code-line">        <span class="code-comment">// 金叉买入</span></span>
+<span class="code-line">        <span class="code-function">Buy</span>(<span class="code-function">Open</span>(<span class="code-number">1</span>), <span class="code-number">1</span>);</span>
+<span class="code-line">    }</span>
+<span class="code-line">    <span class="code-keyword">else if</span> (<span class="code-function">CrossUnder</span>(ma5, ma20)) {</span>
+<span class="code-line">        <span class="code-comment">// 死叉卖出</span></span>
+<span class="code-line">        <span class="code-function">Sell</span>(<span class="code-function">Open</span>(<span class="code-number">1</span>), <span class="code-number">1</span>);</span>
+<span class="code-line">    }</span>
+<span class="code-line">}</span>
+            </div>
+        </div>
+
+        <!-- 右侧：函数目录 -->
+        <div class="panel">
+            <div class="panel-title">📚 函数目录</div>
+            <div class="function-tree">
+                <div class="tree-category">
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>K线数据</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">Open()</div>
+                        <div class="tree-item">High()</div>
+                        <div class="tree-item">Low()</div>
+                        <div class="tree-item">Close()</div>
+                        <div class="tree-item">Vol()</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>即时行情</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">Q_Last()</div>
+                        <div class="tree-item">Q_BidPrice()</div>
+                        <div class="tree-item">Q_AskPrice()</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>策略交易</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">Buy()</div>
+                        <div class="tree-item">Sell()</div>
+                        <div class="tree-item">BuyToCover()</div>
+                        <div class="tree-item">SellShort()</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>策略状态</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">CurrentContracts()</div>
+                        <div class="tree-item">MarketPosition()</div>
+                        <div class="tree-item">EntryPrice()</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>策略性能</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">NetProfit()</div>
+                        <div class="tree-item">GrossProfit()</div>
+                        <div class="tree-item">PercentProfit()</div>
+                    </div>
+                </div>
+
+                <div class="tree-category">
+                    <div class="tree-header collapsed" onclick="toggleTree(this)">
+                        <span class="tree-icon">▼</span>
+                        <span>统计函数</span>
+                    </div>
+                    <div class="tree-items">
+                        <div class="tree-item">Average()</div>
+                        <div class="tree-item">Highest()</div>
+                        <div class="tree-item">Lowest()</div>
+                        <div class="tree-item">CrossOver()</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

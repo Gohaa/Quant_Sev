@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 320px;
+            /* 单行占满视口高度，避免子列被内容撑高后无法出现内部滚动条 */
+            grid-template-rows: minmax(0, 1fr);
+            gap: 15px;
+            height: 100%;
+            min-height: 0;
+            padding: 15px;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            padding: 6px 12px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .tab:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 6px 10px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .contract-list {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: auto;
+            font-size: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(52, 152, 219, 0.55) rgba(0, 0, 0, 0.3);
+        }
+
+        /* 合约列表滚动条在深色背景下更易辨认（不影响布局） */
+        .contract-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .contract-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 4px;
+        }
+        .contract-list::-webkit-scrollbar-thumb {
+            background: rgba(52, 152, 219, 0.45);
+            border-radius: 4px;
+        }
+        .contract-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(52, 152, 219, 0.7);
+        }
+
+        .panel-chart-placeholder {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            color: #95a5a6;
+        }
+
+        /* 右侧栏：整体不滚动；仅「交易查询」内 .trade-tab-panels 纵向滚动 */
+        .panel.panel--tall-scroll {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .trade-right-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            padding-bottom: 0;
+        }
+
+        .trade-pane {
+            flex: 0 0 auto;
+            border: 1px solid rgba(52, 152, 219, 0.38);
+            border-radius: 6px;
+            padding: 10px 10px 12px;
+            background: rgba(22, 22, 22, 0.75);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+        }
+
+        .trade-pane--query {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .trade-pane-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #3498db;
+            margin: 0 0 8px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.28);
+        }
+
+        .trade-pane--query .trade-tab-panels {
+            flex: 1 1 auto;
+            min-height: 0;
+            margin-top: 6px;
+            max-height: none;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .contract-table {
+            width: 100%;
+            min-width: 720px;
+            border-collapse: collapse;
+        }
+
+        .contract-table th {
+            padding: 6px 5px;
+            text-align: left;
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            font-weight: 600;
+            font-size: 11px;
+            border-bottom: 2px solid #3498db;
+            position: sticky;
+            top: 0;
+            white-space: nowrap;
+        }
+
+        .contract-table td {
+            padding: 6px 5px;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .contract-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .contract-table tbody tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .contract-table tbody tr.selected {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+
+        .price-up {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .price-down {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .order-form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 6px 10px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-buy {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-buy:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-sell {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .btn-sell:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-close {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-close:hover {
+            background-color: #2980b9;
+        }
+
+        .position-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 0;
+        }
+
+        .position-tab {
+            padding: 5px 10px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .position-tab.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        /* 交易查询：五个标签单行，收紧左右留白 */
+        #trade-position-tabs {
+            flex-wrap: nowrap;
+            gap: 2px;
+            justify-content: stretch;
+        }
+
+        #trade-position-tabs .position-tab {
+            font-size: 11px;
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 3px 4px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .trade-tab-panels {
+            margin-top: 8px;
+            flex: 1 1 auto;
+            min-height: 100px;
+            max-height: 220px;
+            overflow: auto;
+            border: 1px solid rgba(52, 152, 219, 0.25);
+            border-radius: 4px;
+            background: #1a1a1a;
+        }
+
+        .trade-tab-panel {
+            display: none;
+            padding: 6px;
+            font-size: 11px;
+        }
+
+        .trade-tab-panel.active {
+            display: block;
+        }
+
+        .trade-detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .trade-detail-table th,
+        .trade-detail-table td {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 5px;
+            text-align: left;
+        }
+
+        .trade-detail-table th {
+            color: #95a5a6;
+            font-weight: 600;
+        }
+
+        .account-info {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 交易页「账户信息」块：资金行更紧凑（行高约减半） */
+        .trade-pane--account .account-info {
+            gap: 4px;
+            margin-bottom: 0;
+        }
+
+        .trade-pane--account .info-row {
+            padding: 3px 0;
+            line-height: 1.1;
+        }
+
+        .trade-pane--account .info-label,
+        .trade-pane--account .info-value {
+            line-height: 1.1;
+            font-size: 12px;
+        }
+
+        .info-label {
+            color: #95a5a6;
+            font-size: 12px;
+        }
+
+        .info-value {
+            color: #e0e0e0;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* 交易页「下单面板」：四键高度约减半、组间距收紧 */
+        .trade-pane--order .order-form {
+            gap: 6px;
+        }
+
+        .trade-pane--order .btn-group {
+            margin-top: 4px;
+            gap: 6px;
+        }
+
+        .trade-pane--order .btn {
+            padding: 5px 8px;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            background-color: #1a1a1a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin-bottom: 3px;
+        }
+
+        .log-time {
+            color: #95a5a6;
+            margin-right: 5px;
+        }
+
+        .log-type {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 10px;
+            margin-right: 5px;
+        }
+
+        .log-type.info {
+            background-color: rgba(52, 152, 219, 0.3);
+            color: #3498db;
+        }
+
+        .log-type.success {
+            background-color: rgba(46, 204, 113, 0.3);
+            color: #2ecc71;
+        }
+
+        .log-type.error {
+            background-color: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+        }
+
+        /* 中间栏：实时行情（上）+ 运行日志（下） */
+        .panel--center {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .trade-center-column {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .trade-center-chart,
+        .trade-center-log {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .trade-center-chart {
+            flex: 3 1 0;
+            padding: 12px 15px 10px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.35);
+        }
+
+        .trade-center-log {
+            flex: 2 1 0;
+            padding: 10px 15px 12px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .trade-center-chart .panel-title,
+        .trade-center-log .panel-title {
+            flex-shrink: 0;
+            margin-bottom: 8px;
+        }
+
+        .trade-center-chart-body {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+        }
+
+        #market-chart-frame {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            border: none;
+            background: #1e1e1e;
+            border-radius: 4px;
+        }
+
+        .trade-pane--control {
+            flex: 0 0 42%;
+            min-height: 180px;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .trade-pane--query-embed {
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #trade-control-frame,
+        #trade-query-frame {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            border: none;
+            background: #1e1e1e;
+            border-radius: 4px;
+        }
+
+        .trade-center-log .logger-embed-panel {
+            flex: 1;
+            min-height: 0;
+        }
+
+        .trade-center-log .logger-embed-frame {
+            flex: 1;
+            min-height: 100px;
+            max-height: none;
+        }
+
+        /* 右侧翻页标签栏 */
+        .trade-right-tabs {
+            display: flex;
+            gap: 2px;
+            padding: 8px 10px 0;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+            flex-shrink: 0;
+        }
+
+        .trade-right-tab {
+            padding: 8px 12px;
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 11px;
+            color: #95a5a6;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .trade-right-tab:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #e0e0e0;
+        }
+
+        .trade-right-tab.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+            font-weight: 600;
+        }
+
+        /* 右侧翻页内容区 */
+        .trade-right-content {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .trade-right-panel {
+            display: none;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .trade-right-panel.active {
+            display: flex;
+        }
+
+        /* 右侧各区块样式 */
+        .trade-right-section {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.2);
+        }
+
+        .trade-right-section:last-child {
+            border-bottom: none;
+        }
+
+        .trade-right-section .panel-title {
+            padding: 6px 10px;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        /* 账户信息紧凑样式 */
+        .account-info-compact {
+            padding: 8px 10px;
+            background-color: rgba(52, 152, 219, 0.05);
+            flex-shrink: 0;
+        }
+
+        .info-row-compact {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 11px;
+        }
+
+        .info-label-compact {
+            color: #95a5a6;
+        }
+
+        .info-value-compact {
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+
+        /* 交易查询区块 */
+        .trade-right-section--query {
+            flex: 1;
+            min-height: 120px;
+        }
+
+        .trade-right-section--query iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 120px;
+            border: none;
+            background: #1e1e1e;
+        }
+
+        /* 盘口区块 */
+        .trade-right-section--dom {
+            flex: 2 1 0;
+            min-height: 100px;
+        }
+
+        .trade-right-section--dom iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #1e1e1e;
+        }
+
+        /* 交易控件区块 */
+        .trade-right-section--control {
+            flex: 0 0 auto;
+            min-height: 0;
+        }
+
+        .trade-right-section--control iframe {
+            width: 100%;
+            height: 260px;
+            min-height: 0;
+            flex: 0 0 auto;
+            border: none;
+            background: #1e1e1e;
+        }
+
+        /* 持仓区块 */
+        .trade-right-section--position {
+            flex: 2 1 0;
+            min-height: 100px;
+        }
+
+        .trade-right-section--position iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #1e1e1e;
+        }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧：合约列表 -->
+        <div class="panel">
+            <div class="panel-title">📊 合约列表</div>
+            <div class="tabs">
+                <div class="tab active">主力合约</div>
+                <div class="tab">期权合约</div>
+            </div>
+            <div class="search-box">
+                <input type="text" class="search-input" id="trade-contract-search" placeholder="筛选合约代码…">
+            </div>
+            <div class="contract-list">
+                <table class="contract-table">
+                    <thead>
+                        <tr>
+                            <th>合约</th>
+                            <th>最新价</th>
+                            <th>涨跌幅</th>
+                            <th>买一</th>
+                            <th>卖一</th>
+                            <th>成交量</th>
+                            <th>持仓量</th>
+                            <th>更新时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trade-contract-tbody">
+                        <!-- 由 TradeView_Bridge 轮询 /api/md_quote_board（Symbol.json ∪ subs + QuoteCtl 快照） -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 中间：实时行情 + 运行日志 -->
+        <div class="panel panel--center">
+            <div class="trade-center-column">
+                <section class="trade-center-chart" aria-label="实时行情">
+                    <div class="panel-title">📈 实时行情</div>
+                    <div class="trade-center-chart-body">
+                        <iframe id="market-chart-frame" src="trade/Market_Chart.html" title="实时行情图表"></iframe>
+                    </div>
+                </section>
+                <section class="trade-center-log" aria-label="运行日志">
+                    <div class="panel-title">📋 运行日志</div>
+                    <div class="logger-embed-panel logger-embed-panel--trade">
+                        <iframe class="logger-embed-frame" data-log-id="trade-run-log" src="Logger.html?embed=1" title="运行日志"></iframe>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- 右侧：翻页模式 -->
+        <div class="panel panel--tall-scroll">
+            <div class="trade-right-stack">
+                <!-- 翻页标签栏 -->
+                <div class="trade-right-tabs">
+                    <div class="trade-right-tab active" data-page="account-query">📊 账户信息</div>
+                    <div class="trade-right-tab" data-page="trade-panel">💹 交易界面</div>
+                </div>
+
+                <!-- 翻页内容区 -->
+                <div class="trade-right-content">
+                    <!-- 第一页：账户信息 + 交易查询 -->
+                    <div class="trade-right-panel active" id="right-page-account-query">
+                        <section class="trade-right-section" aria-label="账户信息">
+                            <div class="panel-title">💰 账户信息</div>
+                            <div class="account-info-compact">
+                                <div class="info-row-compact">
+                                    <span class="info-label-compact">账户</span>
+                                    <span class="info-value-compact" id="trade-acct-user">—</span>
+                                </div>
+                                <div class="info-row-compact">
+                                    <span class="info-label-compact">可用</span>
+                                    <span class="info-value-compact" id="trade-acct-available">—</span>
+                                </div>
+                                <div class="info-row-compact">
+                                    <span class="info-label-compact">盈亏</span>
+                                    <span class="info-value-compact" id="trade-acct-pnl">—</span>
+                                </div>
+                                <div class="info-row-compact">
+                                    <span class="info-label-compact">权益</span>
+                                    <span class="info-value-compact" id="trade-acct-balance">—</span>
+                                </div>
+                                <div class="info-row-compact">
+                                    <span class="info-label-compact">保证金</span>
+                                    <span class="info-value-compact" id="trade-acct-margin">—</span>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="trade-right-section trade-right-section--query" aria-label="交易查询">
+                            <iframe id="trade-query-frame-right" src="trade/Trade_Query.html" title="交易查询"></iframe>
+                        </section>
+                    </div>
+
+                    <!-- 第二页：盘口 + 交易控件 + 持仓 -->
+                    <div class="trade-right-panel" id="right-page-trade-panel">
+                        <section class="trade-right-section trade-right-section--dom" aria-label="盘口深度">
+                            <div class="panel-title">📊 盘口</div>
+                            <iframe id="dom-frame-right" src="trade/DOM_Panel.html" title="盘口深度"></iframe>
+                        </section>
+                        <section class="trade-right-section trade-right-section--control" aria-label="交易控件">
+                            <div class="panel-title">💹 报单</div>
+                            <iframe id="trade-control-frame-right" src="trade/Trade_control.html" title="交易控件"></iframe>
+                        </section>
+                        <section class="trade-right-section trade-right-section--position" aria-label="持仓显示">
+                            <div class="panel-title">📊 持仓</div>
+                            <iframe id="position-frame-right" src="trade/Position_Panel.html" title="持仓显示"></iframe>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="logger_Bridge.js"></script>
+    <script src="orderbook_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script src="cta_Bridge.js"></script>
+    <script src="trade_Bridge.js"></script>
+    <script src="trade_ui_Bridge.js"></script>
+    <script>
+        function refreshRightPanelIframes(panelEl) {
+            if (!panelEl) return;
+            panelEl.querySelectorAll('iframe').forEach(function (frame) {
+                try {
+                    if (frame.contentWindow) {
+                        frame.contentWindow.dispatchEvent(new Event('resize'));
+                    }
+                } catch (e) { /* ignore */ }
+            });
+        }
+
+        window.addEventListener('message', function (ev) {
+            var data = ev.data;
+            if (!data || data.type !== 'quant-sev-iframe-resize' || !data.id) return;
+            var frame = document.getElementById(data.id);
+            if (!frame || !data.height) return;
+            frame.style.height = Math.max(120, data.height) + 'px';
+        });
+
+        // 右侧翻页切换功能
+        document.querySelectorAll('.trade-right-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.trade-right-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.trade-right-panel').forEach(p => p.classList.remove('active'));
+
+                this.classList.add('active');
+                const page = this.dataset.page;
+                const panel = document.getElementById('right-page-' + page);
+                if (panel) panel.classList.add('active');
+                requestAnimationFrame(function () {
+                    refreshRightPanelIframes(panel);
+                    window.dispatchEvent(new Event('resize'));
+                });
+            });
+        });
+    </script>
+</body>
+</html>

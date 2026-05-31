@@ -1,0 +1,38 @@
+# Build
+/build-msvc/
+/build-mingw/
+/out/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+CMakeUserPresets.json
+
+# Binaries & debug
+*.exe
+*.pdb
+*.obj
+*.o
+*.a
+*.lib.recipe
+*.tlog/
+
+# CTP runtime (headers stay; copy DLLs locally from broker SDK)
+CTP/*.dll
+
+# Local config with secrets
+config/Account.json
+
+# Market data & runtime flow
+/data/
+/新建文件夹/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log

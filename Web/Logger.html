@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统日志</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Consolas', 'Source Code Pro', 'Microsoft YaHei', monospace;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        body.embed-mode {
+            height: 100%;
+        }
+
+        body:not(.embed-mode) {
+            height: calc(100vh - 50px);
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .toolbar label {
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        .toolbar select,
+        .toolbar input[type="text"] {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .toolbar select {
+            width: 100px;
+        }
+
+        .toolbar input[type="text"] {
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .btn {
+            padding: 4px 12px;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #238636;
+            border-color: #2ea043;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+
+        .btn-secondary {
+            background-color: #21262d;
+            color: #c9d1d9;
+        }
+
+        .btn-secondary:hover {
+            background-color: #30363d;
+        }
+
+        .stats {
+            margin-left: auto;
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 10px;
+            font-size: 12px;
+            line-height: 1.35;
+            word-break: break-word;
+            tab-size: 4;
+            min-height: 0;
+        }
+
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+
+        .log-line {
+            display: block;
+            padding: 1px 0;
+            white-space: pre-wrap;
+        }
+
+        .log-line:hover {
+            background-color: rgba(56, 139, 253, 0.06);
+        }
+
+        .log-time {
+            color: #8b949e;
+            margin-right: 6px;
+        }
+
+        .log-level-info { color: #c9d1d9; }
+        .log-level-warn { color: #d29922; }
+        .log-level-error { color: #f85149; }
+        .log-level-debug { color: #6e7681; }
+        .log-level-fatal { color: #ff6b6b; font-weight: bold; }
+        .log-ctp { color: #79c0ff; }
+        .log-ctp-md { color: #56d364; }
+        .log-ctp-td { color: #a371f7; }
+        .log-ctp-query { color: #8b949e; }
+        .log-ctp-fail { color: #f85149; font-weight: 600; }
+        .log-ctp-ok { color: #3fb950; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <label>级别:</label>
+        <select id="level-filter">
+            <option value="ALL">全部</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="CTP">CTP回报</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+        </select>
+        <input type="text" id="search-input" placeholder="搜索日志...">
+        <button type="button" class="btn btn-secondary" id="btn-clear">清除</button>
+        <button type="button" class="btn btn-secondary" id="btn-refresh">刷新</button>
+        <button type="button" class="btn btn-primary" id="btn-autoscroll">自动滚动: 开</button>
+        <span class="stats" id="log-stats"></span>
+    </div>
+
+    <div id="log-display" class="log-container"></div>
+
+    <script>
+        (function () {
+            var embedMode = /(?:^|[?&])embed=1(?:&|$)/.test(location.search) || window !== window.top;
+            if (embedMode) document.body.classList.add('embed-mode');
+
+            var Transport = {
+                isHttp: function () {
+                    return location.protocol === 'http:' || location.protocol === 'https:';
+                },
+                get: function (path) {
+                    return fetch(path).then(function (r) { return r.json(); });
+                }
+            };
+
+            var logDisplay = document.getElementById('log-display');
+            var levelFilter = document.getElementById('level-filter');
+            var searchInput = document.getElementById('search-input');
+            var logStats = document.getElementById('log-stats');
+            var btnAutoscroll = document.getElementById('btn-autoscroll');
+            var btnRefresh = document.getElementById('btn-refresh');
+            var btnClear = document.getElementById('btn-clear');
+
+            var allLines = [];
+            var autoScroll = true;
+            var refreshTimer = null;
+            var lastSnapshotKey = "";
+            var pollMs = embedMode ? 1500 : 2000;
+
+            function applySnapshotLines(lines) {
+                var incoming = Array.isArray(lines) ? lines : [];
+                var key = incoming.join("\n");
+                if (key === lastSnapshotKey) return;
+                lastSnapshotKey = key;
+                allLines = incoming.slice();
+                renderLogs();
+            }
+
+            function parseLogLevel(line) {
+                if (/\[ERROR\]|\[FATAL\]|FAIL|失败|ErrorID=[1-9]/i.test(line)) return 'ERROR';
+                if (/\[WARN\]|HeartBeatWarning/i.test(line)) return 'WARN';
+                if (/\[DEBUG\]/i.test(line)) return 'DEBUG';
+                if (/\[CTP\]|DialogRsp:|QueryRsp:|GatewayConnect|GatewayDisconnect/i.test(line)) return 'CTP';
+                if (/\[INFO\]/i.test(line)) return 'INFO';
+                if (/\[成功\]|成功| OK |Login OK|Authenticate OK/i.test(line)) return 'INFO';
+                if (/\[错误\]/i.test(line)) return 'ERROR';
+                if (/\[警告\]/.test(line)) return 'WARN';
+                return 'INFO';
+            }
+
+            function ctpClass(line) {
+                if (/FAIL|ErrorID=[1-9]|Authenticate FAIL|Login FAIL/i.test(line)) return 'log-ctp-fail';
+                if (/ OK |Login OK|Authenticate OK|SettlementInfoConfirm OK|FrontConnected/i.test(line)) return 'log-ctp-ok';
+                if (/^QueryRsp:|QueryRsp:/.test(line) || /\[CTP\].*QueryRsp:/.test(line)) return 'log-ctp-query';
+                if (/Md |\[CTP\].*Md |DialogRsp: Md|QueryRsp: Md/i.test(line)) return 'log-ctp-md';
+                if (/Td |\[CTP\].*Td |DialogRsp: Td|QueryRsp: Td/i.test(line)) return 'log-ctp-td';
+                return 'log-ctp';
+            }
+
+            function escapeHtml(s) {
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            function renderLine(line) {
+                var level = parseLogLevel(line);
+                var levelClass = level === 'CTP' ? ctpClass(line) : ('log-level-' + level.toLowerCase());
+                var timeMatch = line.match(/^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\]/);
+                var html;
+                if (timeMatch) {
+                    html = '<span class="log-time">' + escapeHtml(timeMatch[1]) + '</span>' +
+                        '<span class="' + levelClass + '">' + escapeHtml(line.substring(timeMatch[0].length).trimStart()) + '</span>';
+                } else {
+                    html = '<span class="' + levelClass + '">' + escapeHtml(line) + '</span>';
+                }
+                return html;
+            }
+
+            function renderLogs() {
+                var level = levelFilter.value;
+                var search = searchInput.value.toLowerCase();
+                var filtered = allLines.filter(function (line) {
+                    if (level !== 'ALL') {
+                        var pl = parseLogLevel(line);
+                        if (level === 'INFO' && (pl === 'INFO' || pl === 'CTP')) { /* keep */ }
+                        else if (pl !== level) return false;
+                    }
+                    if (search && line.toLowerCase().indexOf(search) < 0) return false;
+                    return true;
+                });
+                logDisplay.innerHTML = filtered.map(function (line) {
+                    return '<div class="log-line">' + renderLine(line) + '</div>';
+                }).join('');
+                logStats.textContent = filtered.length + ' / ' + allLines.length + ' 行';
+                if (autoScroll) logDisplay.scrollTop = logDisplay.scrollHeight;
+            }
+
+            function fetchLogs() {
+                if (!Transport.isHttp()) {
+                    if (!allLines.length)
+                        logDisplay.innerHTML = '<div class="log-line log-level-warn">本地文件模式，无 HTTP 日志接口</div>';
+                    return;
+                }
+                Transport.get("/api/ui_logs")
+                    .then(function (data) {
+                        if (!data) return;
+                        if (Array.isArray(data.lines)) applySnapshotLines(data.lines);
+                    })
+                    .catch(function (e) {
+                        console.error("fetch logs:", e);
+                    });
+            }
+
+            function appendLocalLine(line) {
+                if (!line) return;
+                allLines.push(String(line));
+                if (allLines.length > 5000) allLines = allLines.slice(-4500);
+                lastSnapshotKey = allLines.join("\n");
+                renderLogs();
+            }
+
+            window.addEventListener('message', function (ev) {
+                var d = ev.data;
+                if (!d || d.source !== 'QuantSevLogger') return;
+                if (d.type === 'append') appendLocalLine(d.line);
+                if (d.type === "clear") {
+                    allLines = [];
+                    lastSnapshotKey = "";
+                    renderLogs();
+                }
+            });
+
+            levelFilter.addEventListener('change', renderLogs);
+            searchInput.addEventListener('input', renderLogs);
+            btnAutoscroll.addEventListener('click', function () {
+                autoScroll = !autoScroll;
+                btnAutoscroll.textContent = '自动滚动: ' + (autoScroll ? '开' : '关');
+                btnAutoscroll.className = 'btn ' + (autoScroll ? 'btn-primary' : 'btn-secondary');
+                if (autoScroll) logDisplay.scrollTop = logDisplay.scrollHeight;
+            });
+            btnRefresh.addEventListener('click', fetchLogs);
+            btnClear.addEventListener("click", function () {
+                allLines = [];
+                lastSnapshotKey = "";
+                renderLogs();
+            });
+
+            refreshTimer = setInterval(fetchLogs, pollMs);
+            fetchLogs();
+
+            window.QuantSevLoggerPanel = {
+                append: appendLocalLine,
+                refresh: fetchLogs,
+                clear: function () {
+                    allLines = [];
+                    lastSnapshotKey = "";
+                    renderLogs();
+                },
+            };
+        })();
+    </script>
+</body>
+</html>

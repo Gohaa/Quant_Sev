@@ -1,0 +1,416 @@
+{
+  "version": 1,
+  "title": "中国期货/期权合约代码命名规则",
+  "futureContracts": {
+    "description": "商品期货主力/月份合约代码构成说明",
+    "exchanges": [
+      {
+        "exchange": "SHFE",
+        "name": "上期所",
+        "symbolRules": "品种代码为2位小写英文",
+        "symbolCase": "lower",
+        "symbols": [
+          "au",
+          "ag",
+          "cu",
+          "al",
+          "ni",
+          "sn",
+          "pb",
+          "zn",
+          "ao",
+          "ad",
+          "bu",
+          "fu",
+          "rb",
+          "hc",
+          "ss",
+          "wr",
+          "ru",
+          "br",
+          "sp",
+          "op"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 2,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后2位 + 交割月份（2位）"
+      },
+      {
+        "exchange": "CZCE",
+        "name": "郑商所",
+        "symbolRules": "品种代码为2位大写英文（部分品种为3位，如PTA）",
+        "symbolCase": "upper",
+        "symbols": [
+          "FG",
+          "SA",
+          "SH",
+          "MA",
+          "TA",
+          "PTA",
+          "PL",
+          "PX",
+          "PR",
+          "CF",
+          "PF",
+          "CY",
+          "OI",
+          "RM",
+          "SR",
+          "RS",
+          "PK",
+          "AP",
+          "CJ",
+          "UR",
+          "SF",
+          "SM",
+          "ZC",
+          "JR",
+          "RI",
+          "PM",
+          "WH"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 1,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后1位 + 交割月份（2位）"
+      },
+      {
+        "exchange": "DCE",
+        "name": "大商所",
+        "symbolRules": "品种代码为1或2位小写英文",
+        "symbolCase": "lower",
+        "symbols": [
+          "i",
+          "y",
+          "m",
+          "p",
+          "bz",
+          "eb",
+          "eg",
+          "l",
+          "pp",
+          "v",
+          "pg",
+          "jm",
+          "j",
+          "lh",
+          "c",
+          "cs",
+          "jd",
+          "a",
+          "b",
+          "lg",
+          "rr",
+          "bb",
+          "fb"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 2,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后2位 + 交割月份（2位）"
+      },
+      {
+        "exchange": "GFEX",
+        "name": "广期所",
+        "symbolRules": "品种代码为2位小写英文",
+        "symbolCase": "lower",
+        "symbols": [
+          "si",
+          "ps",
+          "lc",
+          "pt",
+          "pd"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 2,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后2位 + 交割月份（2位）"
+      },
+      {
+        "exchange": "INE",
+        "name": "上期能源",
+        "symbolRules": "品种代码为2位小写英文",
+        "symbolCase": "lower",
+        "symbols": [
+          "sc",
+          "lu",
+          "bc",
+          "nr",
+          "ec"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 2,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后2位 + 交割月份（2位）"
+      },
+      {
+        "exchange": "CFFEX",
+        "name": "中金所",
+        "symbolRules": "品种代码为2位大写英文（部分为1位，如T）",
+        "symbolCase": "upper",
+        "symbols": [
+          "IH",
+          "IF",
+          "IC",
+          "IM",
+          "T",
+          "TF",
+          "TS",
+          "TL"
+        ],
+        "pattern": "{symbol}{yearSuffix}{deliveryMonth}",
+        "yearSuffixDigits": 2,
+        "deliveryMonthDigits": 2,
+        "patternNote": "品种代码 + 年份后2位 + 交割月份（2位）"
+      }
+    ]
+  },
+  "commodityOptions": {
+    "title": "商品期货期权（上期 / 郑商 / 大商 / 广期等）",
+    "callPutLegend": {
+      "call": {
+        "codeChar": "C",
+        "labelZh": "看涨（认购）"
+      },
+      "put": {
+        "codeChar": "P",
+        "labelZh": "看跌（认沽）"
+      }
+    },
+    "formats": [
+      {
+        "exchange": "SHFE",
+        "name": "上期所",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "none",
+        "callPutInContract": {
+          "style": "single_letter",
+          "callToken": "C",
+          "putToken": "P",
+          "templateCall": "{underlying}C{strike}",
+          "templatePut": "{underlying}P{strike}"
+        },
+        "examples": [
+          {
+            "code": "cu2606C72000",
+            "callPut": "call",
+            "callPutCode": "C",
+            "description": "铜 2606 看涨，行权72000"
+          }
+        ]
+      },
+      {
+        "exchange": "CZCE",
+        "name": "郑商所",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "none",
+        "callPutInContract": {
+          "style": "single_letter",
+          "callToken": "C",
+          "putToken": "P",
+          "templateCall": "{underlying}C{strike}",
+          "templatePut": "{underlying}P{strike}"
+        },
+        "examples": [
+          {
+            "code": "TA609P5800",
+            "callPut": "put",
+            "callPutCode": "P",
+            "description": "PTA2609 看跌，行权5800"
+          }
+        ]
+      },
+      {
+        "exchange": "DCE",
+        "name": "大商所",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "hyphen_CP_hyphen",
+        "callPutInContract": {
+          "style": "hyphen_wrapped",
+          "callToken": "-C-",
+          "putToken": "-P-",
+          "templateCall": "{underlying}-C-{strike}",
+          "templatePut": "{underlying}-P-{strike}"
+        },
+        "examples": [
+          {
+            "code": "m2609-C-3200",
+            "callPut": "call",
+            "callPutCode": "-C-",
+            "description": "豆粕 2609 看涨，行权3200"
+          }
+        ]
+      },
+      {
+        "exchange": "GFEX",
+        "name": "广期所",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "hyphen_CP_hyphen",
+        "callPutInContract": {
+          "style": "hyphen_wrapped",
+          "callToken": "-C-",
+          "putToken": "-P-",
+          "templateCall": "{underlying}-C-{strike}",
+          "templatePut": "{underlying}-P-{strike}"
+        },
+        "examples": [
+          {
+            "code": "si2609-P-14000",
+            "callPut": "put",
+            "callPutCode": "-P-",
+            "description": "工业硅 2609 看跌，行权14000"
+          }
+        ]
+      },
+      {
+        "exchange": "INE",
+        "name": "上期能源",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "none",
+        "callPutInContract": {
+          "style": "single_letter",
+          "callToken": "C",
+          "putToken": "P",
+          "templateCall": "{underlying}C{strike}",
+          "templatePut": "{underlying}P{strike}"
+        },
+        "examples": [
+          {
+            "code": "bc2606C91000",
+            "callPut": "call",
+            "callPutCode": "C",
+            "description": "国际铜2606 看涨，行权91000"
+          }
+        ]
+      },
+      {
+        "exchange": "CFFEX",
+        "name": "中金所",
+        "codePattern": "{underlying}{callPutToken}{strike}",
+        "strikeSeparator": "hyphen_CP_hyphen",
+        "callPutInContract": {
+          "style": "hyphen_wrapped",
+          "callToken": "-C-",
+          "putToken": "-P-",
+          "templateCall": "{underlying}-C-{strike}",
+          "templatePut": "{underlying}-P-{strike}"
+        },
+        "examples": [
+          {
+            "code": "IO2606-C-4200",
+            "callPut": "call",
+            "callPutCode": "-C-",
+            "description": "沪深300 看涨，行权4200"
+          }
+        ]
+      }
+    ]
+  },
+  "rollover": {
+    "title": "CTP 期货主力换月与 Storage 路径规则",
+    "description": "解析 instrument_id、映射 data/ 历史目录、指导 Symbol_list 主力合约更新",
+    "yearDecode": {
+      "CZCE": {
+        "digits": 1,
+        "decadeBase": 2020,
+        "note": "年份末1位，当前十年 2020-2029 映射为 0-9"
+      },
+      "default": {
+        "digits": 2,
+        "note": "年份后2位，如 26 表示 2026"
+      }
+    },
+    "storageLayout": {
+      "historicalBars": {
+        "path": "data/{exchange}/{product}/{month_slot}/{period}.csv",
+        "month_slot": {
+          "main": "主力连续（历史回测/展示用）",
+          "01-12": "具体交割月序号目录，与 delivery_month 两位字符串一致"
+        },
+        "periods": {
+          "m1": {
+            "minutes": 1,
+            "csvHeader": "date,time,open,high,low,close,volume,turnover,open_interest"
+          },
+          "m15": {
+            "minutes": 15
+          },
+          "h1": {
+            "minutes": 60
+          },
+          "d1": {
+            "minutes": 1440
+          }
+        }
+      },
+      "liveSession": {
+        "tickPath": "data/{exchange}/{product}/{month_slot}/tick.csv",
+        "tickHeader": "trading_day,update_time,update_millisec,last_price,volume,turnover,open_interest,bid_price1,bid_volume1,ask_price1,ask_volume1",
+        "barPath": "data/{exchange}/{product}/{month_slot}/{period}.csv",
+        "barHeader": "date,time,open,high,low,close,volume,turnover,open_interest",
+        "note": "实盘 tick/bar 与历史同目录 month_slot",
+        "flushIntervalMs": 1000
+      }
+    },
+    "rolloverPolicy": {
+      "defaultMethod": "volume_and_open_interest",
+      "description": "主力换月：次月合约成交量+持仓量连续2个交易日超过当前主力时切换",
+      "trigger": {
+        "metric": "volume_plus_open_interest",
+        "consecutiveDays": 2,
+        "compareWith": "next_nearby_contract"
+      },
+      "actions": {
+        "updateSymbolList": "修改 Symbol_list.json 对应条目的 instrument_id",
+        "resubscribeQuote": "Gateway POST /api/unsubscribe/symbol 旧合约 + /api/load/symbol 新合约",
+        "storageNote": "换月后 tick.csv / m1.csv 写入新 month_slot 目录"
+      },
+      "exchangeRules": [
+        {
+          "exchange": "SHFE",
+          "nearMonthOffset": 1,
+          "avoidDeliveryMonthDays": 5,
+          "note": "交割月前约5个交易日开始降低主力权重；金属类常提前1-2月换月"
+        },
+        {
+          "exchange": "DCE",
+          "nearMonthOffset": 1,
+          "avoidDeliveryMonthDays": 5,
+          "note": "农产品/化工多数按持仓量切换"
+        },
+        {
+          "exchange": "CZCE",
+          "nearMonthOffset": 1,
+          "avoidDeliveryMonthDays": 5,
+          "note": "1位年份后缀，换月后须同步更新 Symbol_list instrument_id"
+        },
+        {
+          "exchange": "INE",
+          "nearMonthOffset": 1,
+          "avoidDeliveryMonthDays": 5
+        },
+        {
+          "exchange": "GFEX",
+          "nearMonthOffset": 1,
+          "avoidDeliveryMonthDays": 5
+        },
+        {
+          "exchange": "CFFEX",
+          "method": "calendar",
+          "rollDay": "third_friday_of_previous_month",
+          "note": "股指/国债期货通常于交割月前一个月第三个周五附近换月"
+        }
+      ],
+      "buildNextContract": {
+        "description": "根据当前 instrument_id 生成候选次月合约代码",
+        "stepOrder": [
+          "parse_product",
+          "increment_delivery_month",
+          "adjust_year_suffix",
+          "format_by_exchange_pattern"
+        ]
+      }
+    }
+  }
+}

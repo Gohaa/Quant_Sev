@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量化策略</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr) 260px;
+            gap: 12px;
+            height: 100%;
+            padding: 12px;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+            flex-shrink: 0;
+        }
+
+        .strategy-list-panel {
+            overflow: hidden;
+        }
+
+        .strategy-table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .strategy-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .strategy-table th {
+            padding: 6px 4px;
+            text-align: left;
+            color: #3498db;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.4);
+            position: sticky;
+            top: 0;
+            background: #1e1e1e;
+        }
+
+        .strategy-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .strategy-table tbody tr.stg-row {
+            cursor: pointer;
+        }
+
+        .strategy-table tbody tr.stg-row:hover {
+            background: rgba(52, 152, 219, 0.12);
+        }
+
+        .strategy-table tbody tr.stg-row.selected {
+            background: rgba(52, 152, 219, 0.28);
+        }
+
+        .status-running { color: #2ecc71; font-weight: 600; }
+        .status-stopped { color: #95a5a6; }
+
+        .config-panel {
+            overflow: hidden;
+        }
+
+        #stg-config-body {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .config-empty {
+            color: #95a5a6;
+            font-size: 13px;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .config-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .config-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e8e8e8;
+        }
+
+        .config-meta {
+            font-size: 11px;
+            color: #95a5a6;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .config-actions { flex-shrink: 0; }
+
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-start { background: #2ecc71; color: #fff; }
+        .btn-start:hover { background: #27ae60; }
+        .btn-stop { background: #e74c3c; color: #fff; }
+        .btn-stop:hover { background: #c0392b; }
+        .btn-add {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            border: 1px solid rgba(52, 152, 219, 0.4);
+            padding: 4px 10px;
+            font-size: 11px;
+        }
+        .btn-add:hover { background: rgba(52, 152, 219, 0.35); }
+
+        .config-section { margin-bottom: 14px; }
+
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #3498db;
+        }
+
+        .global-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .global-grid label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 10px;
+            color: #95a5a6;
+        }
+
+        .global-grid input {
+            padding: 5px 8px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+
+        .readonly-val {
+            padding: 5px 0;
+            color: #f39c12;
+            font-size: 12px;
+        }
+
+        .legs-wrap {
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+        }
+
+        .legs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            min-width: 480px;
+        }
+
+        .legs-table th {
+            padding: 6px 8px;
+            text-align: left;
+            background: rgba(52, 152, 219, 0.12);
+            color: #3498db;
+            white-space: nowrap;
+        }
+
+        .legs-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .legs-table input {
+            width: 100%;
+            min-width: 56px;
+            padding: 4px 6px;
+            background: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 3px;
+            color: #e0e0e0;
+            font-size: 11px;
+        }
+
+        .legs-table input:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .btn-link:hover { text-decoration: underline; }
+
+        .diag-panel {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(46, 204, 113, 0.06);
+            border: 1px solid rgba(46, 204, 113, 0.35);
+            border-radius: 6px;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .diag-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .diag-panel-head .panel-title {
+            margin: 0;
+            padding: 0;
+            border: none;
+            font-size: 12px;
+        }
+
+        .diag-btn {
+            padding: 3px 8px;
+            border: none;
+            border-radius: 3px;
+            background: #3498db;
+            color: #fff;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .diag-muted { color: #95a5a6; }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+        <div class="panel strategy-list-panel">
+            <div class="panel-title">专家顾问</div>
+            <div class="diag-panel">
+                <div class="diag-panel-head">
+                    <div class="panel-title">SimNow 诊断</div>
+                    <button type="button" class="diag-btn" id="diag-refresh-btn">刷新</button>
+                </div>
+                <div id="diag-panel-body"><span class="diag-muted">加载中…</span></div>
+            </div>
+            <div class="strategy-table-wrap">
+                <table class="strategy-table">
+                    <thead>
+                        <tr>
+                            <th>策略</th>
+                            <th>周期</th>
+                            <th>状态</th>
+                            <th>合约</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stg-tbody">
+                        <tr><td colspan="4">加载中…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel config-panel">
+            <div class="panel-title">策略配置（MT5 风格 · 多合约独立参数）</div>
+            <div id="stg-config-body">
+                <div class="config-empty">← 选择左侧策略，为每个合约设置手数与策略参数后启动</div>
+            </div>
+        </div>
+
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">运行日志</div>
+            <iframe class="logger-embed-frame" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+    </div>
+
+    <script src="logger_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script src="diagnostic_Bridge.js"></script>
+    <script src="Strategies_Bridge.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) {
+                QuantSevBridge.Logger.autoInitPage();
+            }
+            var diagBtn = document.getElementById('diag-refresh-btn');
+            function refreshDiag() {
+                if (window.QuantSevBridge && QuantSevBridge.Diagnostic) {
+                    QuantSevBridge.Diagnostic.refreshPanel('diag-panel-body');
+                }
+            }
+            if (diagBtn) diagBtn.addEventListener('click', refreshDiag);
+            refreshDiag();
+            setInterval(refreshDiag, 10000);
+        });
+    </script>
+</body>
+</html>

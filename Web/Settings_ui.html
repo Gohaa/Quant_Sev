@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+            gap: 20px;
+            height: 100%;
+            padding: 20px;
+            max-width: none;
+            margin: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .settings-main {
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            color: #95a5a6;
+            font-weight: 500;
+        }
+
+        .form-input, .form-select {
+            padding: 10px 12px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .radio-group, .checkbox-group {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .radio-item, .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .radio-item input, .checkbox-item input {
+            cursor: pointer;
+        }
+
+        .setting-section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #3498db;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 3px solid #3498db;
+        }
+
+        .contract-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .contract-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: rgba(52, 152, 219, 0.05);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+
+        .contract-info {
+            flex: 1;
+        }
+
+        .contract-name {
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+
+        .contract-detail {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-top: 3px;
+        }
+
+        .contract-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .small-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .small-btn.edit {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .small-btn.delete {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .theme-options {
+            display: flex;
+            gap: 15px;
+        }
+
+        .theme-option {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .theme-option:hover {
+            border-color: #3498db;
+        }
+
+        .theme-option.active {
+            border-color: #3498db;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .theme-preview {
+            height: 60px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .theme-dark {
+            background: linear-gradient(135deg, #1e1e1e 50%, #2b2b2b 50%);
+        }
+
+        .theme-light {
+            background: linear-gradient(135deg, #f5f5f5 50%, #ffffff 50%);
+        }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 合约管理 -->
+        <div class="panel">
+            <div class="panel-title">📊 合约管理</div>
+            
+            <div class="setting-section">
+                <div class="section-title">添加期货合约</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">合约代码</label>
+                        <input type="text" class="form-input" placeholder="例如: IF2401">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">合约名称</label>
+                        <input type="text" class="form-input" placeholder="例如: 沪深300">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">交易所</label>
+                        <select class="form-select">
+                            <option>CFFEX (中金所)</option>
+                            <option>SHFE (上期所)</option>
+                            <option>DCE (大商所)</option>
+                            <option>CZCE (郑商所)</option>
+                            <option>INE (能源所)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">合约乘数</label>
+                        <input type="number" class="form-input" value="300">
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success">➕ 添加合约</button>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <div class="section-title">添加期权合约</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">期权代码</label>
+                        <input type="text" class="form-input" placeholder="例如: IO2401-C-4000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">标的合约</label>
+                        <input type="text" class="form-input" placeholder="例如: IO2401">
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success">➕ 添加期权</button>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <div class="section-title">添加监控网址</div>
+                <div class="form-group">
+                    <label class="form-label">网址</label>
+                    <input type="url" class="form-input" placeholder="例如: https://www.cffex.com.cn">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success">➕ 添加网址</button>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <div class="section-title">已添加合约列表</div>
+                <div class="contract-list">
+                    <div class="contract-item">
+                        <div class="contract-info">
+                            <div class="contract-name">IF2401 - 沪深300</div>
+                            <div class="contract-detail">CFFEX | 乘数: 300 | 最小变动: 0.2</div>
+                        </div>
+                        <div class="contract-actions">
+                            <button class="small-btn edit">编辑</button>
+                            <button class="small-btn delete">删除</button>
+                        </div>
+                    </div>
+                    <div class="contract-item">
+                        <div class="contract-info">
+                            <div class="contract-name">IC2401 - 中证500</div>
+                            <div class="contract-detail">CFFEX | 乘数: 200 | 最小变动: 0.2</div>
+                        </div>
+                        <div class="contract-actions">
+                            <button class="small-btn edit">编辑</button>
+                            <button class="small-btn delete">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 基础设置 -->
+        <div class="panel">
+            <div class="panel-title">⚙️ 基础设置</div>
+            
+            <div class="setting-section">
+                <div class="section-title">主题风格</div>
+                <div class="theme-options">
+                    <div class="theme-option active">
+                        <div class="theme-preview theme-dark"></div>
+                        <div style="color: #e0e0e0; font-weight: 600;">深色主题</div>
+                    </div>
+                    <div class="theme-option">
+                        <div class="theme-preview theme-light"></div>
+                        <div style="color: #e0e0e0; font-weight: 600;">浅色主题</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <div class="section-title">显示设置</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">字体大小</label>
+                        <select class="form-select">
+                            <option>12px</option>
+                            <option selected>13px</option>
+                            <option>14px</option>
+                            <option>16px</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">语言</label>
+                        <div class="radio-group">
+                            <label class="radio-item">
+                                <input type="radio" name="language" value="zh" checked>
+                                <span>中文</span>
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="language" value="en">
+                                <span>英文</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <div class="section-title">系统设置</div>
+                <div class="form-group">
+                    <label class="form-label">开机启动</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="autostart">
+                            <span>是</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="noautostart" checked>
+                            <span>否</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary">💾 保存设置</button>
+                <button class="btn btn-success">📥 导出配置</button>
+                <button class="btn btn-danger">🗑️ 重置设置</button>
+            </div>
+        </div>
+        </div>
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 运行日志</div>
+            <iframe class="logger-embed-frame" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+
+    </div>
+
+    <script src="logger_Bridge.js"></script>
+    <script src="TradeView_Bridge.js"></script>
+    <script src="tick_Bridge.js"></script>
+    <script>
+        // 主题切换
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('设置界面加载完成');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跟单管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+            gap: 15px;
+            height: 100%;
+            padding: 15px;
+        }
+        .main-col {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .panel {
+            background-color: #1e1e1e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 12px 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .panel.flex-grow { flex: 1; }
+        .panel-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.3);
+        }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background-color: #3498db; color: #fff; }
+        .btn-primary:hover { background-color: #2980b9; }
+        .btn-success { background-color: #2ecc71; color: #fff; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-warning { background-color: #f39c12; color: #fff; }
+        .btn-warning:hover { background-color: #d68910; }
+        .btn-danger { background-color: #e74c3c; color: #fff; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-secondary { background-color: #5d6d7e; color: #fff; }
+        .btn-secondary:hover { background-color: #4a5a6a; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .data-table thead { background-color: rgba(52, 152, 219, 0.12); }
+        .data-table th {
+            padding: 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+        }
+        .data-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .data-table tbody tr:hover { background-color: rgba(52, 152, 219, 0.08); }
+        .data-table tbody tr.selected { background-color: rgba(52, 152, 219, 0.18); }
+        .scroll-table-wrap {
+            flex: 1;
+            overflow: auto;
+            min-height: 80px;
+            max-height: 160px;
+        }
+        .form-label { font-size: 11px; color: #95a5a6; margin-bottom: 4px; display: block; }
+        .form-input, .form-select, textarea.form-input {
+            width: 100%;
+            padding: 7px 10px;
+            background-color: #2b2b2b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+        textarea.form-input { min-height: 56px; resize: vertical; }
+        .form-input:focus, .form-select:focus, textarea.form-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .hint { font-size: 11px; color: #95a5a6; margin-top: 6px; line-height: 1.45; }
+        .link-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 8px; }
+        .link-bar .form-group { flex: 1; min-width: 140px; }
+        .status-on { color: #2ecc71; font-weight: 600; }
+        .status-off { color: #e74c3c; font-weight: 600; }
+        .log-panel { flex: 1; min-height: 0; }
+        .log-area {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            background: #252525;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: clamp(6px, 1vw, 12px);
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: clamp(0.6875rem, 0.55rem + 0.45vw, 1rem);
+            line-height: 1.5;
+            color: #bdc3c7;
+        }
+        .log-line { margin-bottom: 2px; }
+        .split-panels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            min-height: 0;
+        }
+        .sub-panel {
+            border: 1px solid rgba(52, 152, 219, 0.25);
+            border-radius: 6px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .sub-title { font-size: 12px; color: #5dade2; margin-bottom: 6px; }
+    </style>
+    <link rel="stylesheet" href="logger_embed.css">
+</head>
+<body>
+    <div class="container">
+    <div class="main-col">
+        <div class="split-panels">
+            <div class="panel" style="flex:1;">
+                <div class="panel-title">主账户</div>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="ft-master-add">添加主账户</button>
+                    <button type="button" class="btn btn-success" id="ft-master-login">登录</button>
+                    <button type="button" class="btn btn-secondary" id="ft-master-logout">退出</button>
+                </div>
+                <div class="scroll-table-wrap">
+                    <table class="data-table" id="ft-master-table">
+                        <thead>
+                            <tr>
+                                <th>账户名</th>
+                                <th>状态</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="selected"><td>—</td><td><span class="status-off">未连接</span></td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel" style="flex:1;">
+                <div class="panel-title">跟单账户</div>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="ft-follow-add">添加跟单账户</button>
+                    <button type="button" class="btn btn-success" id="ft-follow-login">登录</button>
+                    <button type="button" class="btn btn-secondary" id="ft-follow-logout">退出</button>
+                </div>
+                <div class="scroll-table-wrap">
+                    <table class="data-table" id="ft-follow-table">
+                        <thead>
+                            <tr>
+                                <th>账户名</th>
+                                <th>状态</th>
+                                <th>关联主账户</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>—</td><td><span class="status-off">未连接</span></td><td>—</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">主从关联</div>
+            <p class="hint">为跟单账户指定或移除绑定的主账户；支持多个主账户与多个跟单账户组合（由后端维护多组关系）。</p>
+            <div class="link-bar">
+                <div class="form-group">
+                    <label class="form-label">主账户</label>
+                    <select class="form-select" id="ft-link-master">
+                        <option value="">请选择主账户…</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">跟单账户</label>
+                    <select class="form-select" id="ft-link-follow">
+                        <option value="">请选择跟单账户…</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="ft-link-add">添加关联</button>
+                <button type="button" class="btn btn-danger" id="ft-link-remove">删除关联</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">跟单控制</div>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label class="form-label">跟单品种（每行一个合约代码，仅对这些品种跟单）</label>
+                    <textarea class="form-input" id="ft-symbols" placeholder="例如：&#10;rb2505&#10;ag2506"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">跟单倍数</label>
+                    <input type="number" class="form-input" id="ft-multiple" value="1" min="0.01" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">跟单延迟</label>
+                    <input type="text" class="form-input" id="ft-delay" value="3–10 秒随机" readonly>
+                    <p class="hint">实际延迟由系统在 3～10 秒内随机取值，降低同秒下单特征。</p>
+                </div>
+            </div>
+            <div class="btn-row" style="margin-top:10px;">
+                <button type="button" class="btn btn-success" id="ft-apply-params">保存参数</button>
+                <button type="button" class="btn btn-warning" id="ft-sync-orders">拉取主账户委托</button>
+                <span class="hint" style="margin:0;align-self:center;">委托信息为下单回报，不等待成交。</span>
+            </div>
+        </div>
+
+        <div class="panel flex-grow">
+            <div class="panel-title">持仓对照（主账户 / 跟单账户 · 按品种）</div>
+            <div class="scroll-table-wrap" style="max-height:none;">
+                <table class="data-table" id="ft-position-table">
+                    <thead>
+                        <tr>
+                            <th>合约</th>
+                            <th>主账户持仓</th>
+                            <th>跟单账户持仓</th>
+                            <th>方向</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" style="color:#7f8c8d;">暂无数据（连接账户并订阅后由引擎刷新）</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 运行日志</div>
+            <iframe class="logger-embed-frame" src="Logger.html?embed=1" title="运行日志"></iframe>
+        </div>
+
+    </div>
+</body>
+</html>

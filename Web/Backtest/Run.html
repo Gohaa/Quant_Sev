@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史回测 · 回测</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="backtest.css">
+    <link rel="stylesheet" href="../logger_embed.css">
+</head>
+<body data-bt-page="run">
+    <div class="container">
+        <div class="panel">
+            <nav class="bt-subnav">
+                <a href="Run.html" class="active">▶️ 回测</a>
+                <a href="Optimize.html">🔧 参数优化</a>
+            </nav>
+            <div class="left-scroll">
+                <div class="form-group">
+                    <label class="form-label">标的（多合约用逗号分隔）</label>
+                    <input type="text" id="bt-symbol" class="form-input" value="rb2610" placeholder="rb2610 或 rb2610,fg509">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回测模式</label>
+                    <select id="bt-mode" class="form-select">
+                        <option value="bar">Bar 回放（读 CSV）</option>
+                        <option value="tick">Tick 回放（intra-bar 撮合）</option>
+                        <option value="compare">Bar vs Tick 对比</option>
+                        <option value="multi_symbol">多合约对比 (Bar)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">K线周期</label>
+                    <select id="bt-period" class="form-select">
+                        <option>1分钟</option><option>5分钟</option>
+                        <option selected>15分钟</option><option>1小时</option><option>日线</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">策略</label>
+                    <select id="bt-strategy" class="form-select">
+                        <option value="">加载策略…</option>
+                    </select>
+                </div>
+                <div class="panel-title" style="margin-top:4px;">📦 合约参数</div>
+                <div class="form-group">
+                    <label class="form-label">合约乘数 / 最小变动</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="number" id="bt-multiplier" class="form-input" placeholder="自动" step="1">
+                        <input type="number" id="bt-tick" class="form-input" placeholder="自动" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">滑点（tick 数）</label>
+                    <input type="number" id="bt-slippage" class="form-input" value="0" min="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">手续费率 / 固定（元/手·边）</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="number" id="bt-fee-rate" class="form-input" value="0.0001" step="0.00001">
+                        <input type="number" id="bt-fee-lot" class="form-input" value="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">保证金比例</label>
+                    <input type="number" id="bt-margin-rate" class="form-input" value="0.1" min="0" max="1" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">初始资金</label>
+                    <input type="number" id="bt-capital" class="form-input" value="1000000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回测日期（起）</label>
+                    <input type="date" id="bt-start-date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">回测日期（止）</label>
+                    <input type="date" id="bt-end-date" class="form-input">
+                </div>
+                <div class="form-group" id="bt-tick-limit-group" style="display:none;">
+                    <label class="form-label">最大 Tick 数</label>
+                    <input type="number" id="bt-max-ticks" class="form-input" value="200000">
+                </div>
+                <div class="panel-title" style="margin-top:4px;">📐 策略 Input</div>
+                <div id="bt-strategy-inputs">
+                    <p class="hint">选择策略后从 CTA 加载 input 默认值</p>
+                </div>
+                <button class="btn" id="bt-run-btn" type="button">▶️ 开始回测</button>
+                <div id="bt-progress-wrap" class="progress-wrap">
+                    <div class="progress-bar"><div id="bt-progress-fill" class="progress-fill"></div></div>
+                    <div id="bt-progress-text" class="progress-text">等待开始…</div>
+                </div>
+                <button class="btn" id="bt-verify-btn" type="button" style="background:#3498db;margin-top:4px;">📐 核对 Storage</button>
+                <button class="btn" id="bt-trade-btn" type="button" style="background:#95a5a6;margin-top:4px;">📈 在交易页查看</button>
+                <p class="hint">多合约请用逗号分隔；日期留空则使用 CSV 末段（最多 5 万根）。</p>
+            </div>
+        </div>
+
+        <div class="center-panel panel">
+            <div class="view-tabs">
+                <button type="button" class="view-tab-btn active" data-view="summary">绩效概况</button>
+                <button type="button" class="view-tab-btn" data-view="signals">信号分析</button>
+                <button type="button" class="view-tab-btn" data-view="data">数据详细</button>
+                <button type="button" class="view-tab-btn" data-view="trades">交易分析</button>
+                <button type="button" class="view-tab-btn" data-view="verify">数据核对</button>
+            </div>
+
+            <div id="bt-view-summary" class="view-panel active">
+                <div class="split-top">
+                    <div class="panel-title">📈 权益曲线</div>
+                    <div id="bt-equity-chart" class="chart-host"></div>
+                </div>
+                <div class="split-bottom">
+                    <div class="panel-title">📊 绩效指标</div>
+                    <div id="bt-perf-grid" class="metric-grid"></div>
+                </div>
+            </div>
+
+            <div id="bt-view-signals" class="view-panel">
+                <div class="symbol-pager" id="bt-symbol-pager">
+                    <button type="button" class="symbol-pager-btn" id="bt-symbol-prev">◀ 上一品种</button>
+                    <span class="symbol-pager-label" id="bt-symbol-label">—</span>
+                    <button type="button" class="symbol-pager-btn" id="bt-symbol-next">下一品种 ▶</button>
+                </div>
+                <div class="split-top">
+                    <div class="panel-title">📊 K线 + 指标 + 买卖点</div>
+                    <div id="bt-bar-chart" class="chart-host"></div>
+                </div>
+                <div class="split-bottom scroll-box">
+                    <table class="data-table">
+                        <thead><tr><th>品种</th><th>时间</th><th>动作</th><th>标签</th><th>价格</th></tr></thead>
+                        <tbody id="bt-signals-body"><tr><td colspan="5">等待回测</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="bt-view-data" class="view-panel">
+                <div class="panel-title">📁 回测数据详情</div>
+                <div class="scroll-box" style="flex:1;">
+                    <table class="data-table">
+                        <thead><tr><th>字段</th><th>值</th></tr></thead>
+                        <tbody id="bt-data-body"><tr><td colspan="2">等待回测</td></tr></tbody>
+                    </table>
+                    <div class="panel-title" style="margin:10px 0 6px;">输出文件</div>
+                    <table class="data-table">
+                        <thead><tr><th>文件</th><th>说明</th><th>来源</th></tr></thead>
+                        <tbody id="bt-files-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="bt-view-trades" class="view-panel">
+                <div class="panel-title">📋 交易基本分析</div>
+                <div class="scroll-box" style="max-height:180px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>品种</th><th>交易次数</th><th>多头</th><th>空头</th>
+                                <th>胜率</th><th>多头胜率</th><th>空头胜率</th>
+                                <th>手续费</th><th>滑点损耗</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bt-trade-stats-body"></tbody>
+                    </table>
+                </div>
+                <div class="panel-title" style="margin-top:8px;">平仓明细</div>
+                <div class="scroll-box" style="flex:1;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>品种</th><th>方向</th><th>开仓时间</th><th>平仓时间</th><th>持仓K线</th>
+                                <th>开仓价</th><th>平仓价</th><th>盈亏</th><th>手续费</th><th>滑点损耗</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bt-closes-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="bt-view-verify" class="view-panel">
+                <div class="panel-title">📐 回测数据核对</div>
+                <div id="bt-verify-summary" class="hint" style="margin-bottom:8px;">运行回测后对比 Storage 与回测 K 线</div>
+                <div class="split-top">
+                    <div class="panel-title">K 线对比（末 80 根）</div>
+                    <div id="bt-verify-chart" class="chart-host"></div>
+                </div>
+                <div class="split-bottom scroll-box">
+                    <table class="data-table">
+                        <thead><tr><th>#</th><th>时间</th><th>回测收</th><th>Storage收</th><th>一致</th></tr></thead>
+                        <tbody id="bt-verify-body"><tr><td colspan="5">等待回测</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel logger-embed-panel logger-embed-panel--tall page-log-side">
+            <div class="panel-title">📋 回测日志</div>
+            <iframe class="logger-embed-frame" src="../Logger.html?embed=1" title="回测日志"></iframe>
+        </div>
+    </div>
+
+    <script src="../logger_Bridge.js"></script>
+    <script src="../diagnostic_Bridge.js"></script>
+    <script src="../Backtest_Bridge.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.QuantSevBridge && QuantSevBridge.Logger) QuantSevBridge.Logger.autoInitPage();
+            if (window.QuantSevBridge && QuantSevBridge.Backtest) QuantSevBridge.Backtest.initPage('run');
+        });
+    </script>
+</body>
+</html>
