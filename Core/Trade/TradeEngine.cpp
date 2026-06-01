@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "Common/ContractRules.hpp"
 #include "Common/CtpUtil.hpp"
 #include "Common/JsonQuery.hpp"
 #include "Logger/Logger.hpp"
@@ -173,6 +174,7 @@ void TdSpiImpl::OnRspAuthenticate(CThostFtdcRspAuthenticateField* /*pRspAuthenti
         session_->cv.notify_all();
         return;
     }
+    Logger::instance().ctp("DialogRsp: Td OnRspAuthenticate OK user=" + session_->account.user_id);
     request_login();
 }
 
@@ -186,12 +188,17 @@ void TdSpiImpl::OnRspUserLogin(CThostFtdcRspUserLoginField* pRspUserLogin,
         session_->last_error = "Td 登录失败(" + std::to_string(pRspInfo->ErrorID) + "): " +
                                trim_cstr(pRspInfo->ErrorMsg);
         Logger::instance().error(session_->last_error);
+        Logger::instance().error(session_->last_error);
         session_->cv.notify_all();
         return;
     }
     if (pRspUserLogin != nullptr) {
         session_->front_id = pRspUserLogin->FrontID;
         session_->session_id = pRspUserLogin->SessionID;
+        Logger::instance().ctp("DialogRsp: Td OnRspUserLogin OK user=" + session_->account.user_id +
+                               " FrontID=" + std::to_string(pRspUserLogin->FrontID) +
+                               " SessionID=" + std::to_string(pRspUserLogin->SessionID) +
+                               " TradingDay=" + trim_cstr(pRspUserLogin->TradingDay));
     }
 
     CThostFtdcSettlementInfoConfirmField confirm{};
@@ -214,17 +221,21 @@ void TdSpiImpl::OnRspSettlementInfoConfirm(CThostFtdcSettlementInfoConfirmField*
         session_->logged_in = true;
         session_->settlement_confirmed = true;
         session_->last_error.clear();
-        Logger::instance().ctp("Td 登录就绪: " + session_->account.user_id);
+        Logger::instance().ctp("DialogRsp: Td OnRspSettlementInfoConfirm OK user=" + session_->account.user_id);
     }
     session_->cv.notify_all();
 }
 
 void TdSpiImpl::OnRspOrderInsert(CThostFtdcInputOrderField* pInputOrder, CThostFtdcRspInfoField* pRspInfo,
                                  int nRequestID, bool bIsLast) {
-    if (session_ == nullptr || !bIsLast) {
+    if (session_ == nullptr) {
         return;
     }
     if (nRequestID != session_->pending_order_request_id) {
+        return;
+    }
+    const bool has_error = pRspInfo != nullptr && pRspInfo->ErrorID != 0;
+    if (!has_error && !bIsLast) {
         return;
     }
     std::lock_guard<std::mutex> lock(session_->mutex);
@@ -232,16 +243,30 @@ void TdSpiImpl::OnRspOrderInsert(CThostFtdcInputOrderField* pInputOrder, CThostF
     if (pInputOrder != nullptr) {
         session_->pending_order_result.order_ref = trim_cstr(pInputOrder->OrderRef);
     }
-    if (pRspInfo != nullptr && pRspInfo->ErrorID != 0) {
+    if (has_error) {
         session_->pending_order_result.ok = false;
         session_->pending_order_result.error_id = pRspInfo->ErrorID;
-        session_->pending_order_result.message =
-            "报单拒绝(" + std::to_string(pRspInfo->ErrorID) + "): " + trim_cstr(pRspInfo->ErrorMsg);
-        Logger::instance().warn(session_->pending_order_result.message);
-    } else {
+        const char* hint = ctp_order_error_hint(pRspInfo->ErrorID);
+        if (hint != nullptr) {
+            session_->pending_order_result.message =
+                "报单拒绝(" + std::to_string(pRspInfo->ErrorID) + "): " + hint;
+        } else {
+            session_->pending_order_result.message =
+                "报单拒绝(" + std::to_string(pRspInfo->ErrorID) + "): " +
+                sanitize_utf8(trim_cstr(pRspInfo->ErrorMsg));
+        }
+        Logger::instance().ctp("DialogRsp: Td OnRspOrderInsert FAIL OrderRef=" +
+                               session_->pending_order_result.order_ref + " ErrorID=" +
+                               std::to_string(pRspInfo->ErrorID) + " " +
+                               sanitize_utf8(trim_cstr(pRspInfo->ErrorMsg)));
+    } else if (!session_->pending_order_result.ok) {
         session_->pending_order_result.ok = true;
         session_->pending_order_result.message = "报单已提交";
-        Logger::instance().ctp("报单录入成功 OrderRef=" + session_->pending_order_result.order_ref);
+        const std::string inst =
+            pInputOrder != nullptr ? trim_cstr(pInputOrder->InstrumentID) : std::string{};
+        Logger::instance().ctp("DialogRsp: Td OnRspOrderInsert OK OrderRef=" +
+                               session_->pending_order_result.order_ref +
+                               (inst.empty() ? "" : " InstrumentID=" + inst));
     }
     session_->cv.notify_all();
 }
@@ -353,7 +378,7 @@ nlohmann::json order_update_to_json(const OrderUpdateRecord& record) {
             {"insert_date", record.insert_date},
             {"insert_time", record.insert_time},
             {"update_time", record.update_time},
-            {"status_msg", record.status_msg}};
+            {"status_msg", sanitize_utf8(record.status_msg)}};
 }
 
 nlohmann::json trade_update_to_json(const TradeUpdateRecord& record) {
@@ -458,7 +483,7 @@ OrderUpdateRecord build_order_update(CThostFtdcOrderField* pOrder, const std::st
     }
     record.insert_time = trim_cstr(pOrder->InsertTime);
     record.update_time = trim_cstr(pOrder->UpdateTime);
-    record.status_msg = trim_cstr(pOrder->StatusMsg);
+    record.status_msg = sanitize_utf8(trim_cstr(pOrder->StatusMsg));
     return record;
 }
 
@@ -471,6 +496,13 @@ void TdSpiImpl::OnRtnOrder(CThostFtdcOrderField* pOrder) {
     std::function<void(const nlohmann::json&)> notify;
     {
         std::lock_guard<std::mutex> lock(session_->mutex);
+        if (session_->pending_order_request_id != 0 && !session_->order_response_ready &&
+            record.order_ref == session_->pending_order_result.order_ref) {
+            session_->order_response_ready = true;
+            session_->pending_order_result.ok = true;
+            session_->pending_order_result.message = "报单已提交";
+            session_->cv.notify_all();
+        }
         session_->order_updates.push_back(record);
         if (session_->order_updates.size() > 500) {
             session_->order_updates.erase(
@@ -480,10 +512,20 @@ void TdSpiImpl::OnRtnOrder(CThostFtdcOrderField* pOrder) {
         }
         notify = session_->order_notify;
     }
-    Logger::instance().ctp("OnRtnOrder " + record.instrument_id + " ref=" + record.order_ref +
-                           " status=" + record.status);
+    Logger::instance().ctp("DialogRsp: Td OnRtnOrder InstrumentID=" + record.instrument_id + " OrderRef=" +
+                           record.order_ref + " OrderSysID=" + record.order_sys_id + " Status=" +
+                           record.status + " Vol=" + std::to_string(record.volume_traded) + "/" +
+                           std::to_string(record.volume_total) + " Price=" +
+                           std::to_string(record.limit_price) +
+                           (record.status_msg.empty() ? "" : " StatusMsg=" + record.status_msg));
     if (notify) {
-        notify(payload);
+        try {
+            notify(payload);
+        } catch (const std::exception& ex) {
+            Logger::instance().error(std::string("order_notify 异常: ") + ex.what());
+        } catch (...) {
+            Logger::instance().error("order_notify 未知异常");
+        }
     }
 }
 
@@ -505,10 +547,18 @@ void TdSpiImpl::OnRtnTrade(CThostFtdcTradeField* pTrade) {
         }
         notify = session_->trade_notify;
     }
-    Logger::instance().ctp("OnRtnTrade " + record.instrument_id + " id=" + record.trade_id +
-                           " vol=" + std::to_string(record.volume) + " @ " + std::to_string(record.price));
+    Logger::instance().ctp("DialogRsp: Td OnRtnTrade InstrumentID=" + record.instrument_id + " TradeID=" +
+                           record.trade_id + " OrderRef=" + record.order_ref + " Direction=" +
+                           record.direction + " Offset=" + record.offset + " Vol=" +
+                           std::to_string(record.volume) + " Price=" + std::to_string(record.price));
     if (notify) {
-        notify(payload);
+        try {
+            notify(payload);
+        } catch (const std::exception& ex) {
+            Logger::instance().error(std::string("trade_notify 异常: ") + ex.what());
+        } catch (...) {
+            Logger::instance().error("trade_notify 未知异常");
+        }
     }
 }
 
@@ -577,6 +627,14 @@ void TdSpiImpl::OnRspQryTradingAccount(CThostFtdcTradingAccountField* pTradingAc
         session_->trading_account_cached = true;
     }
     if (bIsLast) {
+        if (session_->pending_account.has_account) {
+            const auto& acc = session_->pending_account.account;
+            Logger::instance().ctp("QueryRsp: Td OnRspQryTradingAccount user=" + session_->account.user_id +
+                                   " Balance=" + std::to_string(acc.balance) + " Available=" +
+                                   std::to_string(acc.available) + " Margin=" + std::to_string(acc.curr_margin));
+        } else {
+            Logger::instance().ctp("QueryRsp: Td OnRspQryTradingAccount user=" + session_->account.user_id);
+        }
         session_->pending_account.ready = true;
         session_->cv.notify_all();
     }
@@ -597,19 +655,45 @@ void merge_investor_position_row(std::unordered_map<std::string, InvestorPositio
     }
     auto& snap = book[instrument_id];
     snap.instrument_id = instrument_id;
+    const std::string exchange_id = trim_cstr(field->ExchangeID);
+    if (!exchange_id.empty()) {
+        snap.exchange_id = exchange_id;
+    }
     const double avg_price = volume > 0 ? field->PositionCost / static_cast<double>(volume) : 0.0;
     snap.position_profit += field->PositionProfit;
+    const bool is_today = field->PositionDate == THOST_FTDC_PSD_Today;
     if (field->PosiDirection == THOST_FTDC_PD_Long) {
-        snap.long_volume = volume;
-        snap.avg_long_price = avg_price;
+        if (is_today) {
+            snap.long_today += volume;
+        } else {
+            snap.long_yd += volume;
+        }
+        snap.long_volume = snap.long_today + snap.long_yd;
+        if (avg_price > 0) {
+            snap.avg_long_price = avg_price;
+        }
         snap.long_profit += field->PositionProfit;
     } else if (field->PosiDirection == THOST_FTDC_PD_Short) {
-        snap.short_volume = volume;
-        snap.avg_short_price = avg_price;
+        if (is_today) {
+            snap.short_today += volume;
+        } else {
+            snap.short_yd += volume;
+        }
+        snap.short_volume = snap.short_today + snap.short_yd;
+        if (avg_price > 0) {
+            snap.avg_short_price = avg_price;
+        }
         snap.short_profit += field->PositionProfit;
     } else {
-        snap.long_volume = volume;
-        snap.avg_long_price = avg_price;
+        if (is_today) {
+            snap.long_today += volume;
+        } else {
+            snap.long_yd += volume;
+        }
+        snap.long_volume = snap.long_today + snap.long_yd;
+        if (avg_price > 0) {
+            snap.avg_long_price = avg_price;
+        }
         snap.long_profit += field->PositionProfit;
     }
 }
@@ -631,6 +715,9 @@ void TdSpiImpl::OnRspQryInvestorPosition(CThostFtdcInvestorPositionField* pInves
         merge_investor_position_row(session_->pending_positions.by_instrument, pInvestorPosition);
     }
     if (bIsLast) {
+        Logger::instance().ctp("QueryRsp: Td OnRspQryInvestorPosition legs=" +
+                               std::to_string(session_->pending_positions.by_instrument.size()) + " user=" +
+                               session_->account.user_id);
         session_->pending_positions.ready = true;
         session_->cv.notify_all();
     }
@@ -654,11 +741,14 @@ void TdSpiImpl::OnRspOrderAction(CThostFtdcInputOrderActionField* pInputOrderAct
         session_->pending_action_result.error_id = pRspInfo->ErrorID;
         session_->pending_action_result.message =
             "撤单拒绝(" + std::to_string(pRspInfo->ErrorID) + "): " + trim_cstr(pRspInfo->ErrorMsg);
-        Logger::instance().warn(session_->pending_action_result.message);
+        Logger::instance().ctp("DialogRsp: Td OnRspOrderAction FAIL OrderRef=" +
+                               session_->pending_action_result.order_ref + " ErrorID=" +
+                               std::to_string(pRspInfo->ErrorID) + " " + trim_cstr(pRspInfo->ErrorMsg));
     } else {
         session_->pending_action_result.ok = true;
         session_->pending_action_result.message = "撤单已提交";
-        Logger::instance().ctp("撤单录入成功 OrderRef=" + session_->pending_action_result.order_ref);
+        Logger::instance().ctp("DialogRsp: Td OnRspOrderAction OK OrderRef=" +
+                               session_->pending_action_result.order_ref);
     }
     session_->cv.notify_all();
 }
@@ -736,12 +826,38 @@ char map_price_type(const std::string& price_type) {
 }  // namespace
 #endif
 
+#ifdef QUANT_SEV_HAS_CTP
+namespace {
+
+std::string td_session_key(const AccountRecord& account) {
+    return account.user_id + "\x1f" + account.td_front;
+}
+
+}  // namespace
+#endif
+
 struct TradeEngine::Impl {
     mutable std::mutex mutex;
     fs::path project_root{"."};
+    mutable bll::ContractRules contract_rules;
+    mutable bool contract_rules_loaded{false};
     OrderListener order_listener;
     TradeListener trade_listener;
     std::function<void(const std::string&, int)> disconnect_callback;
+
+    void ensure_contract_rules_loaded() const {
+        if (contract_rules_loaded) {
+            return;
+        }
+        const auto rules_path = project_root / "config" / "Contract_Rules.json";
+        contract_rules.load(rules_path.string());
+        contract_rules_loaded = true;
+    }
+
+    std::optional<bll::ParsedInstrument> parse_instrument(const std::string& instrument_id) const {
+        ensure_contract_rules_loaded();
+        return contract_rules.parse(instrument_id);
+    }
 #ifdef QUANT_SEV_HAS_CTP
     std::unordered_map<std::string, std::unique_ptr<TdSession>> sessions;
 
@@ -753,7 +869,13 @@ struct TradeEngine::Impl {
                 listener = order_listener;
             }
             if (listener) {
-                listener(payload);
+                try {
+                    listener(payload);
+                } catch (const std::exception& ex) {
+                    Logger::instance().error(std::string("order_listener 异常: ") + ex.what());
+                } catch (...) {
+                    Logger::instance().error("order_listener 未知异常");
+                }
             }
         };
     }
@@ -766,7 +888,13 @@ struct TradeEngine::Impl {
                 listener = trade_listener;
             }
             if (listener) {
-                listener(payload);
+                try {
+                    listener(payload);
+                } catch (const std::exception& ex) {
+                    Logger::instance().error(std::string("trade_listener 异常: ") + ex.what());
+                } catch (...) {
+                    Logger::instance().error("trade_listener 未知异常");
+                }
             }
         };
     }
@@ -802,9 +930,10 @@ ConnectResult TradeEngine::connect(const AccountRecord& account) {
     return {false, "CTP 未启用：请配置 CTP SDK 库并开启 QUANT_SEV_ENABLE_CTP 重新编译"};
 #else
     std::unique_lock<std::mutex> lock(impl_->mutex);
-    auto& slot = impl_->sessions[account.user_id];
+    const std::string key = td_session_key(account);
+    auto& slot = impl_->sessions[key];
     if (slot && slot->logged_in) {
-        return {true, "交易已连接: " + account.user_id};
+        return {true, "交易已连接: " + account.user_id + " @ " + account.td_front};
     }
 
     if (!slot) {
@@ -816,7 +945,9 @@ ConnectResult TradeEngine::connect(const AccountRecord& account) {
     slot->disconnect_callback = impl_->disconnect_callback;
 
     if (slot->api == nullptr) {
-        const fs::path flow_dir = impl_->project_root / "data" / "flow" / ("td_" + account.user_id);
+        const fs::path flow_dir =
+            impl_->project_root / "data" / "flow" /
+            ("td_" + account.user_id + "_" + std::to_string(std::hash<std::string>{}(account.td_front)));
         fs::create_directories(flow_dir);
         slot->spi = new TdSpiImpl(slot.get());
         slot->api = CThostFtdcTraderApi::CreateFtdcTraderApi(flow_dir.string().c_str(), true);
@@ -847,21 +978,22 @@ ConnectResult TradeEngine::connect(const AccountRecord& account) {
 #endif
 }
 
-ConnectResult TradeEngine::disconnect(const std::string& user_id) {
-    if (user_id.empty()) {
-        return {false, "user_id 为空"};
+ConnectResult TradeEngine::disconnect(const AccountRecord& account) {
+    if (account.user_id.empty() || account.td_front.empty()) {
+        return {false, "user_id / td_front 为空"};
     }
 #ifndef QUANT_SEV_HAS_CTP
     return {false, "CTP 未启用"};
 #else
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    auto it = impl_->sessions.find(user_id);
+    const std::string key = td_session_key(account);
+    auto it = impl_->sessions.find(key);
     if (it == impl_->sessions.end()) {
         return {true, "交易未连接"};
     }
     destroy_session(*it->second);
     impl_->sessions.erase(it);
-    Logger::instance().info("Td 已断开: " + user_id);
+    Logger::instance().info("Td 已断开: " + account.user_id + " @ " + account.td_front);
     return {true, "Td 已断开"};
 #endif
 }
@@ -886,23 +1018,41 @@ bool TradeEngine::is_user_ready(const std::string& user_id) const {
     return false;
 #else
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    const auto it = impl_->sessions.find(user_id);
+    for (const auto& [_, session] : impl_->sessions) {
+        if (session->account.user_id == user_id && session->logged_in.load()) {
+            return true;
+        }
+    }
+    return false;
+#endif
+}
+
+bool TradeEngine::is_account_ready(const AccountRecord& account) const {
+#ifndef QUANT_SEV_HAS_CTP
+    (void)account;
+    return false;
+#else
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    const auto it = impl_->sessions.find(td_session_key(account));
     return it != impl_->sessions.end() && it->second->logged_in.load();
 #endif
 }
 
 nlohmann::json TradeEngine::td_sessions_status() const {
 #ifndef QUANT_SEV_HAS_CTP
-    return {{"users", nlohmann::json::array()}};
+    return {{"users", nlohmann::json::array()}, {"sessions", nlohmann::json::array()}};
 #else
     nlohmann::json users = nlohmann::json::array();
+    nlohmann::json sessions = nlohmann::json::array();
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [user_id, session] : impl_->sessions) {
-        if (session->logged_in.load()) {
-            users.push_back(user_id);
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!session->logged_in.load()) {
+            continue;
         }
+        users.push_back(session->account.user_id);
+        sessions.push_back({{"user_id", session->account.user_id}, {"td_front", session->account.td_front}});
     }
-    return {{"users", users}};
+    return {{"users", users}, {"sessions", sessions}};
 #endif
 }
 
@@ -921,7 +1071,7 @@ OrderResult TradeEngine::insert_order(const AccountRecord& account, const OrderR
     result.message = "CTP 未启用";
     return result;
 #else
-    if (!is_user_ready(account.user_id)) {
+    if (!is_account_ready(account)) {
         const auto connected = connect(account);
         if (!connected.ok) {
             result.message = connected.message;
@@ -930,7 +1080,7 @@ OrderResult TradeEngine::insert_order(const AccountRecord& account, const OrderR
     }
 
     std::unique_lock<std::mutex> lock(impl_->mutex);
-    const auto it = impl_->sessions.find(account.user_id);
+    const auto it = impl_->sessions.find(td_session_key(account));
     if (it == impl_->sessions.end() || !it->second->logged_in || it->second->api == nullptr) {
         result.message = "交易未登录: " + account.user_id;
         return result;
@@ -948,11 +1098,21 @@ OrderResult TradeEngine::insert_order(const AccountRecord& account, const OrderR
     session.pending_order_result.order_ref = order_ref;
     session.order_response_ready = false;
 
+    std::string ctp_instrument_id = request.instrument_id;
+    std::string exchange_id;
+    if (const auto parsed = impl_->parse_instrument(request.instrument_id)) {
+        exchange_id = parsed->exchange;
+        ctp_instrument_id = parsed->product + parsed->year_suffix + parsed->delivery_month;
+    }
+
     CThostFtdcInputOrderField req{};
     copy_to_field(req.BrokerID, account.broker_id);
     copy_to_field(req.InvestorID, account.user_id);
     copy_to_field(req.UserID, account.user_id);
-    copy_to_field(req.InstrumentID, request.instrument_id);
+    copy_to_field(req.InstrumentID, ctp_instrument_id);
+    if (!exchange_id.empty()) {
+        copy_to_field(req.ExchangeID, exchange_id);
+    }
     copy_to_field(req.OrderRef, order_ref);
     req.OrderPriceType = map_price_type(request.price_type);
     req.Direction = map_direction(request.direction);
@@ -975,7 +1135,7 @@ OrderResult TradeEngine::insert_order(const AccountRecord& account, const OrderR
     }
 
     lock.unlock();
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
     {
         std::unique_lock<std::mutex> wait_lock(session.mutex);
         session.cv.wait_until(wait_lock, deadline, [&]() { return session.order_response_ready; });
@@ -1032,8 +1192,8 @@ nlohmann::json TradeEngine::order_updates(const nlohmann::json& query) const {
     return {{"orders", rows}};
 #else
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [uid, session] : impl_->sessions) {
-        if (!user_id.empty() && uid != user_id) {
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!user_id.empty() && session->account.user_id != user_id) {
             continue;
         }
         for (auto it = session->order_updates.rbegin(); it != session->order_updates.rend(); ++it) {
@@ -1056,8 +1216,8 @@ nlohmann::json TradeEngine::trade_updates(const nlohmann::json& query) const {
     return {{"trades", rows}};
 #else
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [uid, session] : impl_->sessions) {
-        if (!user_id.empty() && uid != user_id) {
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!user_id.empty() && session->account.user_id != user_id) {
             continue;
         }
         for (auto it = session->trade_updates.rbegin(); it != session->trade_updates.rend(); ++it) {
@@ -1112,15 +1272,21 @@ nlohmann::json investor_positions_to_json(const std::vector<InvestorPositionSnap
         total_short += pos.short_volume;
         if (pos.long_volume > 0) {
             rows.push_back({{"instrument_id", pos.instrument_id},
+                            {"exchange_id", pos.exchange_id},
                             {"direction", "long"},
                             {"volume", pos.long_volume},
+                            {"long_today", pos.long_today},
+                            {"long_yd", pos.long_yd},
                             {"open_price", pos.avg_long_price},
                             {"position_profit", pos.long_profit}});
         }
         if (pos.short_volume > 0) {
             rows.push_back({{"instrument_id", pos.instrument_id},
+                            {"exchange_id", pos.exchange_id},
                             {"direction", "short"},
                             {"volume", pos.short_volume},
+                            {"short_today", pos.short_today},
+                            {"short_yd", pos.short_yd},
                             {"open_price", pos.avg_short_price},
                             {"position_profit", pos.short_profit}});
         }
@@ -1149,7 +1315,7 @@ nlohmann::json TradeEngine::query_investor_positions(const AccountRecord* accoun
         if (account == nullptr || user_id.empty()) {
             return {{"error", "refresh 需要有效 user_id 与已连接账户"}};
         }
-        if (!is_user_ready(account->user_id)) {
+        if (!is_account_ready(*account)) {
             const auto connected = connect(*account);
             if (!connected.ok) {
                 return {{"error", connected.message}};
@@ -1157,7 +1323,7 @@ nlohmann::json TradeEngine::query_investor_positions(const AccountRecord* accoun
         }
 
         std::unique_lock<std::mutex> lock(impl_->mutex);
-        const auto it = impl_->sessions.find(account->user_id);
+        const auto it = impl_->sessions.find(td_session_key(*account));
         if (it == impl_->sessions.end() || !it->second->logged_in || it->second->api == nullptr) {
             return {{"error", "交易未登录: " + account->user_id}};
         }
@@ -1198,8 +1364,8 @@ nlohmann::json TradeEngine::query_investor_positions(const AccountRecord* accoun
     }
 
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [uid, session] : impl_->sessions) {
-        if (!user_id.empty() && uid != user_id) {
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!user_id.empty() && session->account.user_id != user_id) {
             continue;
         }
         if (!session->position_cached) {
@@ -1246,7 +1412,7 @@ nlohmann::json TradeEngine::query_history(const AccountRecord* account, const nl
         if (account == nullptr || user_id.empty()) {
             return {{"error", "refresh 需要有效 user_id 与已连接账户"}};
         }
-        if (!is_user_ready(account->user_id)) {
+        if (!is_account_ready(*account)) {
             const auto connected = connect(*account);
             if (!connected.ok) {
                 return {{"error", connected.message}};
@@ -1254,7 +1420,7 @@ nlohmann::json TradeEngine::query_history(const AccountRecord* account, const nl
         }
 
         std::unique_lock<std::mutex> lock(impl_->mutex);
-        const auto it = impl_->sessions.find(account->user_id);
+        const auto it = impl_->sessions.find(td_session_key(*account));
         if (it == impl_->sessions.end() || !it->second->logged_in || it->second->api == nullptr) {
             return {{"error", "交易未登录: " + account->user_id}};
         }
@@ -1315,8 +1481,8 @@ nlohmann::json TradeEngine::query_history(const AccountRecord* account, const nl
     }
 
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [uid, session] : impl_->sessions) {
-        if (!user_id.empty() && uid != user_id) {
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!user_id.empty() && session->account.user_id != user_id) {
             continue;
         }
 
@@ -1400,7 +1566,7 @@ nlohmann::json TradeEngine::query_trading_account(const AccountRecord* account, 
         if (account == nullptr || user_id.empty()) {
             return {{"error", "refresh 需要有效 user_id 与已连接账户"}};
         }
-        if (!is_user_ready(account->user_id)) {
+        if (!is_account_ready(*account)) {
             const auto connected = connect(*account);
             if (!connected.ok) {
                 return {{"error", connected.message}};
@@ -1408,7 +1574,7 @@ nlohmann::json TradeEngine::query_trading_account(const AccountRecord* account, 
         }
 
         std::unique_lock<std::mutex> lock(impl_->mutex);
-        const auto it = impl_->sessions.find(account->user_id);
+        const auto it = impl_->sessions.find(td_session_key(*account));
         if (it == impl_->sessions.end() || !it->second->logged_in || it->second->api == nullptr) {
             return {{"error", "交易未登录: " + account->user_id}};
         }
@@ -1447,8 +1613,16 @@ nlohmann::json TradeEngine::query_trading_account(const AccountRecord* account, 
     }
 
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    for (const auto& [uid, session] : impl_->sessions) {
-        if (!user_id.empty() && uid != user_id) {
+    if (account != nullptr) {
+        const auto it = impl_->sessions.find(td_session_key(*account));
+        if (it != impl_->sessions.end() && it->second->trading_account_cached) {
+            return {{"source", refresh ? "ctp" : "cache"},
+                    {"cached", true},
+                    {"account", trading_account_to_json(it->second->trading_account_cache)}};
+        }
+    }
+    for (const auto& [_, session] : impl_->sessions) {
+        if (!user_id.empty() && session->account.user_id != user_id) {
             continue;
         }
         if (!session->trading_account_cached) {
@@ -1472,11 +1646,16 @@ std::optional<TradingAccountSnapshot> TradeEngine::cached_trading_account(const 
         return std::nullopt;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    const auto it = impl_->sessions.find(user_id);
-    if (it == impl_->sessions.end() || !it->second->trading_account_cached) {
-        return std::nullopt;
+    for (const auto& [_, session] : impl_->sessions) {
+        if (session->account.user_id != user_id) {
+            continue;
+        }
+        if (!session->trading_account_cached) {
+            continue;
+        }
+        return session->trading_account_cache;
     }
-    return it->second->trading_account_cache;
+    return std::nullopt;
 #endif
 }
 
@@ -1495,7 +1674,7 @@ CancelResult TradeEngine::cancel_order(const AccountRecord& account, const Cance
     result.message = "CTP 未启用";
     return result;
 #else
-    if (!is_user_ready(account.user_id)) {
+    if (!is_account_ready(account)) {
         const auto connected = connect(account);
         if (!connected.ok) {
             result.message = connected.message;
@@ -1504,7 +1683,7 @@ CancelResult TradeEngine::cancel_order(const AccountRecord& account, const Cance
     }
 
     std::unique_lock<std::mutex> lock(impl_->mutex);
-    const auto it = impl_->sessions.find(account.user_id);
+    const auto it = impl_->sessions.find(td_session_key(account));
     if (it == impl_->sessions.end() || !it->second->logged_in || it->second->api == nullptr) {
         result.message = "交易未登录: " + account.user_id;
         return result;

@@ -76,6 +76,11 @@
                     }
                     return data;
                 });
+            }).catch(function (err) {
+                if (err && err.message === 'Failed to fetch') {
+                    throw new Error('无法连接后端服务，请确认 quant_sev_host 已启动');
+                }
+                throw err;
             });
         }
     };
@@ -153,7 +158,28 @@
             if (!acc) return false;
             if (acc.td_connected === true) return true;
             if (!st || !st.td_ok) return false;
+            var tdFront = acc.td_front || acc.trader_front || '';
+            var sessions = st.connected_td_sessions || [];
+            for (var i = 0; i < sessions.length; i++) {
+                var s = sessions[i] || {};
+                if (String(s.user_id) === String(acc.user_id) &&
+                    (!tdFront || String(s.td_front) === String(tdFront))) {
+                    return true;
+                }
+            }
+            if (tdFront) return false;
             return this.listHas(st.connected_td_users, acc.user_id);
+        },
+        storeAccountContext: function (acc) {
+            if (!acc) return;
+            try {
+                if (global.localStorage) {
+                    localStorage.setItem('quant_sev_user_id', acc.user_id || '');
+                    localStorage.setItem('quant_sev_account_name', acc.name || '');
+                    localStorage.setItem('quant_sev_md_front', acc.md_front || '');
+                    localStorage.setItem('quant_sev_td_front', acc.td_front || acc.trader_front || '');
+                }
+            } catch (e) { /* ignore */ }
         },
         connectPayload: function () {
             return {
@@ -226,9 +252,7 @@
             this.selectedName = name;
             this.selectedUserId = acc.user_id;
             this.highlightRow(name);
-            try {
-                if (global.localStorage) localStorage.setItem('quant_sev_user_id', acc.user_id);
-            } catch (e) { /* ignore */ }
+            this.storeAccountContext(acc);
             setVal('acc-name', acc.name);
             setVal('acc-user', acc.user_id);
             setVal('acc-md-front', acc.md_front);
@@ -280,6 +304,8 @@
                     if (kind === 'md' && res && res.symbol_subscribe_error) {
                         Logger.warn('Symbol 订阅: ' + res.symbol_subscribe_error);
                     }
+                    var acc = self.accountsCache.find(function (a) { return a.name === accName; });
+                    if (acc) self.storeAccountContext(acc);
                     if (accName) {
                         var mdOk = kind === 'md' && (res.md_connected === true || res.ok !== false);
                         var tdOk = kind === 'td' && (res.td_connected === true || res.ok !== false);

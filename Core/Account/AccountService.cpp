@@ -40,6 +40,40 @@ std::optional<AccountRecord> AccountService::find_by_user_id(const std::string& 
     return match;
 }
 
+std::optional<AccountRecord> AccountService::resolve(const nlohmann::json& payload) const {
+    const std::string user_id = payload.value("user_id", "");
+    const std::string name = payload.value("name", "");
+    const std::string md_front = payload.value("md_front", "");
+    const std::string td_front = payload.value("td_front", payload.value("trader_front", ""));
+
+    const auto accounts = list_accounts();
+    if (!name.empty()) {
+        for (const auto& account : accounts) {
+            if (account.name == name) {
+                return account;
+            }
+        }
+    }
+    if (!user_id.empty() && (!md_front.empty() || !td_front.empty())) {
+        for (const auto& account : accounts) {
+            if (account.user_id != user_id) {
+                continue;
+            }
+            if (!md_front.empty() && account.md_front != md_front) {
+                continue;
+            }
+            if (!td_front.empty() && account.td_front != td_front) {
+                continue;
+            }
+            return account;
+        }
+    }
+    if (!user_id.empty()) {
+        return find_by_user_id(user_id);
+    }
+    return std::nullopt;
+}
+
 nlohmann::json AccountService::saved_accounts_public() const {
     nlohmann::json out = nlohmann::json::object();
     out["accounts"] = nlohmann::json::array();

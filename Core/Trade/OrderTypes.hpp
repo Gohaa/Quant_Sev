@@ -8,7 +8,7 @@ struct OrderRequest {
     std::string user_id;
     std::string instrument_id;
     std::string direction;    // buy | sell
-    std::string offset;       // open | close | close_today
+    std::string offset;       // open | close | close_today（Trade/CTP 层）
     std::string price_type;   // limit | market | opponent
     double price{0};
     int volume{0};
@@ -93,8 +93,13 @@ struct TradingAccountSnapshot {
 
 struct InvestorPositionSnapshot {
     std::string instrument_id;
+    std::string exchange_id;
     int long_volume{0};
     int short_volume{0};
+    int long_today{0};
+    int long_yd{0};
+    int short_today{0};
+    int short_yd{0};
     double avg_long_price{0};
     double avg_short_price{0};
     double long_profit{0};

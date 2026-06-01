@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <iomanip>
+#include <cctype>
 #include <sstream>
 
 #include "Common/JsonQuery.hpp"
@@ -612,14 +613,22 @@ void CtaEngine::replace_positions_from_snapshot(const std::string& user_id, cons
             const double open_price = row.value("open_price", 0.0);
             if (direction == "long") {
                 pos.long_volume = volume;
+                pos.long_today = row.value("long_today", volume);
+                pos.long_yd = row.value("long_yd", 0);
                 pos.avg_long_price = open_price;
             } else if (direction == "short") {
                 pos.short_volume = volume;
+                pos.short_today = row.value("short_today", volume);
+                pos.short_yd = row.value("short_yd", 0);
                 pos.avg_short_price = open_price;
             }
         } else {
             pos.long_volume = row.value("long", row.value("long_volume", 0));
             pos.short_volume = row.value("short", row.value("short_volume", 0));
+            pos.long_today = row.value("long_today", 0);
+            pos.long_yd = row.value("long_yd", 0);
+            pos.short_today = row.value("short_today", 0);
+            pos.short_yd = row.value("short_yd", 0);
             pos.avg_long_price = row.value("avg_long_price", 0.0);
             pos.avg_short_price = row.value("avg_short_price", 0.0);
         }
@@ -676,11 +685,24 @@ std::optional<CtaPositionView> CtaEngine::position_for(const std::string& user_i
     if (user_it == positions_by_user_.end()) {
         return std::nullopt;
     }
-    const auto pos_it = user_it->second.find(instrument_id);
-    if (pos_it == user_it->second.end()) {
-        return std::nullopt;
+    const auto same_instrument = [&](const std::string& left, const std::string& right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < left.size(); ++i) {
+            if (std::tolower(static_cast<unsigned char>(left[i])) !=
+                std::tolower(static_cast<unsigned char>(right[i]))) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (const auto& [key, pos] : user_it->second) {
+        if (same_instrument(key, instrument_id)) {
+            return pos;
+        }
     }
-    return pos_it->second;
+    return std::nullopt;
 }
 
 nlohmann::json CtaEngine::orders_view(const nlohmann::json& query) const {

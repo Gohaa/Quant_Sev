@@ -116,7 +116,16 @@ void TickWsServer::stop() {
 
 void TickWsServer::broadcast_event(const std::string& type, const nlohmann::json& data) {
     nlohmann::json envelope = {{"type", type}, {"data", data}};
-    const std::string payload = envelope.dump();
+    std::string payload;
+    try {
+        payload = envelope.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    } catch (const std::exception& ex) {
+        Logger::instance().warn(std::string("WebSocket 广播序列化失败: ") + ex.what());
+        return;
+    } catch (...) {
+        Logger::instance().warn("WebSocket 广播序列化失败");
+        return;
+    }
     const auto frame = ws::encode_text_frame(payload);
 
     std::lock_guard<std::mutex> lock(clients_mutex_);

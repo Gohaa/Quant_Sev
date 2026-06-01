@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 
 namespace quant_sev::bll {
 
@@ -121,7 +122,22 @@ void OrderBookEngine::on_tick(const nlohmann::json& tick) {
 
 nlohmann::json OrderBookEngine::snapshot(const std::string& instrument_id, int depth) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    const auto it = books_.find(instrument_id);
+    auto it = books_.find(instrument_id);
+    if (it == books_.end()) {
+        const auto same_id = [&](const std::pair<const std::string, OrderBookSnapshot>& row) {
+            if (row.first.size() != instrument_id.size()) {
+                return false;
+            }
+            for (std::size_t i = 0; i < instrument_id.size(); ++i) {
+                if (std::tolower(static_cast<unsigned char>(row.first[i])) !=
+                    std::tolower(static_cast<unsigned char>(instrument_id[i]))) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        it = std::find_if(books_.begin(), books_.end(), same_id);
+    }
     if (it == books_.end()) {
         return {{"error", "instrument not found"}, {"instrument_id", instrument_id}};
     }

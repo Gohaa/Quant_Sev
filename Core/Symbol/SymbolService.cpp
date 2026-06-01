@@ -30,11 +30,7 @@ std::optional<std::string> SymbolService::resolve_md_front(const nlohmann::json&
             return front;
         }
     }
-    const std::string user_id = payload.value("user_id", "");
-    if (user_id.empty()) {
-        return std::nullopt;
-    }
-    const auto account = accounts_.find_by_user_id(user_id);
+    const auto account = accounts_.resolve(payload);
     if (!account) {
         return std::nullopt;
     }
@@ -88,19 +84,16 @@ ConnectResult SymbolService::load_symbols(const nlohmann::json& payload) {
     }
 
     const std::string user_id = payload.value("user_id", "");
-    if (!user_id.empty()) {
-        const auto account = accounts_.find_by_user_id(user_id);
-        if (!account) {
-            return {false, "未找到账户 user_id"};
+    const auto account = accounts_.resolve(payload);
+    if (account && !quote_.is_front_ready(*md_front)) {
+        const auto connected = quote_.connect(*account);
+        if (!connected.ok) {
+            return connected;
         }
-        if (!quote_.is_front_ready(*md_front)) {
-            const auto connected = quote_.connect(*account);
-            if (!connected.ok) {
-                return connected;
-            }
-        }
+    } else if (!account && !user_id.empty()) {
+        return {false, "未找到账户"};
     } else if (!quote_.is_front_ready(*md_front)) {
-        return {false, "行情未连接，请先 POST /api/load/md 或提供 user_id"};
+        return {false, "行情未连接，请先 POST /api/load/md 或提供有效账户"};
     }
 
     const auto result = quote_.subscribe_instruments(*md_front, instruments);

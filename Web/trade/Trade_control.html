@@ -87,10 +87,114 @@
             font-size: 11px;
         }
 
-        .direction-btns {
+        .direction-btns,
+        .action-btns {
             display: flex;
             gap: 6px;
         }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn.buy {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+            border-color: rgba(231, 76, 60, 0.3);
+        }
+
+        .action-btn.buy:hover,
+        .action-btn.buy.active {
+            background-color: #e74c3c;
+            color: #fff;
+        }
+
+        .action-btn.sell {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+            border-color: rgba(46, 204, 113, 0.3);
+        }
+
+        .action-btn.sell:hover,
+        .action-btn.sell.active {
+            background-color: #2ecc71;
+            color: #fff;
+        }
+
+        .action-btn.close-pos {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            border-color: rgba(52, 152, 219, 0.3);
+        }
+
+        .action-btn.close-pos:hover,
+        .action-btn.close-pos.active {
+            background-color: #3498db;
+            color: #fff;
+        }
+
+        .link-btn {
+            float: right;
+            background: none;
+            border: none;
+            color: #3498db;
+            font-size: 10px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .positions-wrap {
+            max-height: 140px;
+            overflow: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+        }
+
+        .positions-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        .positions-table th {
+            position: sticky;
+            top: 0;
+            background: #252525;
+            color: #95a5a6;
+            font-weight: 600;
+            padding: 4px 3px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .positions-table td {
+            padding: 4px 3px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .positions-table tr.selectable {
+            cursor: pointer;
+        }
+
+        .positions-table tr.selectable:hover {
+            background: rgba(52, 152, 219, 0.12);
+        }
+
+        .positions-table tr.selected {
+            background: rgba(52, 152, 219, 0.22);
+        }
+
+        .pos-long { color: #e74c3c; }
+        .pos-short { color: #2ecc71; }
+        .pos-profit-up { color: #e74c3c; }
+        .pos-profit-down { color: #2ecc71; }
 
         .direction-btn {
             flex: 1;
@@ -252,7 +356,7 @@
         </div>
 
         <div class="panel-section">
-            <div class="section-title">合约选择</div>
+            <div class="section-title" id="contract-section-title">合约</div>
             <div class="form-group">
                 <select class="form-select" id="contract-select">
                     <option value="RB2410">RB2410 螺纹钢</option>
@@ -265,19 +369,35 @@
         </div>
 
         <div class="panel-section">
-            <div class="section-title">买卖方向</div>
-            <div class="direction-btns">
-                <button class="direction-btn buy active" id="buy-btn">买入开仓</button>
-                <button class="direction-btn sell" id="sell-btn">卖出开仓</button>
+            <div class="section-title">操作</div>
+            <div class="action-btns">
+                <button type="button" class="action-btn buy active" id="action-buy" data-action="buy">买入</button>
+                <button type="button" class="action-btn sell" id="action-sell" data-action="sell">卖出</button>
+                <button type="button" class="action-btn close-pos" id="action-close" data-action="close">平仓</button>
             </div>
         </div>
 
         <div class="panel-section">
-            <div class="section-title">开平标志</div>
-            <div class="offset-btns">
-                <button class="offset-btn active" data-offset="open">开仓</button>
-                <button class="offset-btn" data-offset="close">平仓</button>
-                <button class="offset-btn" data-offset="close-today">平今</button>
+            <div class="section-title">
+                持仓
+                <button type="button" class="link-btn" id="positions-refresh-btn">刷新</button>
+            </div>
+            <div class="positions-wrap">
+                <table class="positions-table">
+                    <thead>
+                        <tr>
+                            <th>合约</th>
+                            <th>方向</th>
+                            <th>手数</th>
+                            <th>今/昨</th>
+                            <th>均价</th>
+                            <th>盈亏</th>
+                        </tr>
+                    </thead>
+                    <tbody id="control-positions-tbody">
+                        <tr><td colspan="6">未连接</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -304,12 +424,159 @@
     </div>
 
     <script>
-        let currentDirection = 'buy';
-        let currentOffset = 'open';
+        let currentAction = 'buy';
         let currentOrderType = 'limit';
+        let lastPositionPayload = null;
+        let selectedPositionLeg = null;
+        let controlPositions = [];
+        let positionsCtpSynced = false;
+        let contractOptionsLoaded = false;
+        let lastQuoteSnapshot = null;
+        let quotePollTimer = null;
+
+        function currentDirection() {
+            if (currentAction === 'buy') return 'buy';
+            if (currentAction === 'sell') return 'sell';
+            var leg = selectedPositionLeg || findPositionLegForContract(document.getElementById('contract-select').value);
+            if (!leg) return 'sell';
+            var dir = String(leg.direction || '').toLowerCase();
+            return (dir === 'long' || dir === 'buy') ? 'sell' : 'buy';
+        }
+
+        function currentOffset() {
+            return currentAction === 'close' ? 'close' : 'open';
+        }
+
+        function normalizeInstId(id) {
+            return String(id || '').trim().toUpperCase();
+        }
+
+        function quoteLookupId(id) {
+            return String(id || '').trim().toLowerCase();
+        }
 
         function bridge() {
             try { return window.parent.QuantSevBridge; } catch (e) { return null; }
+        }
+
+        function fetchQuoteSnapshot(instrumentId) {
+            var b = bridge();
+            if (!b || !b.Logger || !b.Logger.Transport) {
+                return Promise.resolve(null);
+            }
+            var ids = [];
+            var raw = String(instrumentId || '').trim();
+            if (raw) {
+                ids.push(raw);
+                ids.push(raw.toLowerCase());
+                ids.push(raw.toUpperCase());
+            }
+            var seen = {};
+            ids = ids.filter(function (id) {
+                if (!id || seen[id]) return false;
+                seen[id] = true;
+                return true;
+            });
+
+            function tryOrderBook(index) {
+                if (index >= ids.length) {
+                    return tryQuoteBoard();
+                }
+                var path = '/api/orderbook?instrument_id=' + encodeURIComponent(ids[index]) + '&depth=5';
+                return b.Logger.Transport.get(path).then(function (snap) {
+                    if (snap && !snap.error && (snap.last_price > 0 || (snap.bids && snap.bids.length))) {
+                        return snap;
+                    }
+                    return tryOrderBook(index + 1);
+                }).catch(function () {
+                    return tryOrderBook(index + 1);
+                });
+            }
+
+            function tryQuoteBoard() {
+                return b.Logger.Transport.get('/api/md_quote_board').then(function (data) {
+                    var quotes = (data && data.quotes) || [];
+                    var target = quoteLookupId(instrumentId);
+                    for (var i = 0; i < quotes.length; i++) {
+                        var q = quotes[i];
+                        if (quoteLookupId(q.instrument_id) !== target) continue;
+                        var bids = [];
+                        var asks = [];
+                        if (q.bid_price1 > 0) bids.push({ price: q.bid_price1, volume: q.bid_volume1 || 0 });
+                        if (q.ask_price1 > 0) asks.push({ price: q.ask_price1, volume: q.ask_volume1 || 0 });
+                        return {
+                            instrument_id: q.instrument_id,
+                            last_price: q.last_price || 0,
+                            bids: bids,
+                            asks: asks
+                        };
+                    }
+                    return null;
+                }).catch(function () { return null; });
+            }
+
+            return tryOrderBook(0);
+        }
+
+        function resolveOrderPrice(direction, priceType, snap) {
+            if (!snap) return 0;
+            var bid1 = (snap.bids && snap.bids[0]) ? Number(snap.bids[0].price) : 0;
+            var ask1 = (snap.asks && snap.asks[0]) ? Number(snap.asks[0].price) : 0;
+            var last = Number(snap.last_price) || 0;
+            if (priceType === 'opponent') {
+                return direction === 'buy' ? (ask1 || last) : (bid1 || last);
+            }
+            if (priceType === 'market') {
+                return last || (direction === 'buy' ? ask1 : bid1);
+            }
+            return 0;
+        }
+
+        function formatOrderPrice(value) {
+            if (!value || isNaN(value) || value <= 0) return '';
+            return String(value);
+        }
+
+        function applyOrderTypePriceDisplay() {
+            var priceInput = document.getElementById('order-price');
+            if (!priceInput) return;
+            if (currentOrderType === 'limit') {
+                priceInput.disabled = false;
+                priceInput.placeholder = '输入限价';
+                return;
+            }
+            priceInput.disabled = true;
+            priceInput.placeholder = currentOrderType === 'market' ? '最新价' : '对手价';
+            var px = resolveOrderPrice(currentDirection(), currentOrderType, lastQuoteSnapshot);
+            priceInput.value = px > 0 ? formatOrderPrice(px) : '';
+        }
+
+        function refreshOrderPriceFromQuote() {
+            var contract = document.getElementById('contract-select').value;
+            if (!contract) {
+                lastQuoteSnapshot = null;
+                applyOrderTypePriceDisplay();
+                return Promise.resolve();
+            }
+            return fetchQuoteSnapshot(contract).then(function (snap) {
+                lastQuoteSnapshot = snap;
+                applyOrderTypePriceDisplay();
+            });
+        }
+
+        function startQuotePoll() {
+            stopQuotePoll();
+            if (currentOrderType === 'limit') return;
+            quotePollTimer = setInterval(function () {
+                refreshOrderPriceFromQuote();
+            }, 1500);
+        }
+
+        function stopQuotePoll() {
+            if (quotePollTimer) {
+                clearInterval(quotePollTimer);
+                quotePollTimer = null;
+            }
         }
 
         function setControlText(id, text) {
@@ -383,43 +650,177 @@
                 });
         }
 
-        document.getElementById('buy-btn').addEventListener('click', function() {
-            currentDirection = 'buy';
-            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            updateDirectionText();
-        });
-
-        document.getElementById('sell-btn').addEventListener('click', function() {
-            currentDirection = 'sell';
-            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            updateDirectionText();
-        });
-
-        function updateDirectionText() {
-            const buyBtn = document.getElementById('buy-btn');
-            const sellBtn = document.getElementById('sell-btn');
-            
-            if (currentOffset === 'open') {
-                buyBtn.textContent = '买入开仓';
-                sellBtn.textContent = '卖出开仓';
-            } else if (currentOffset === 'close') {
-                buyBtn.textContent = '买入平仓';
-                sellBtn.textContent = '卖出平仓';
-            } else if (currentOffset === 'close-today') {
-                buyBtn.textContent = '买入平今';
-                sellBtn.textContent = '卖出平今';
-            }
+        function positionLegKey(p) {
+            return normalizeInstId(p.instrument_id) + ':' + String(p.direction || '').toLowerCase();
         }
 
-        document.querySelectorAll('.offset-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                currentOffset = this.dataset.offset;
-                document.querySelectorAll('.offset-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                updateDirectionText();
+        function directionLegText(dir) {
+            var d = String(dir || '').toLowerCase();
+            if (d === 'long' || d === 'buy') return '多';
+            if (d === 'short' || d === 'sell') return '空';
+            return d || '—';
+        }
+
+        function directionLegClass(dir) {
+            var d = String(dir || '').toLowerCase();
+            return (d === 'long' || d === 'buy') ? 'pos-long' : 'pos-short';
+        }
+
+        function formatTodayYd(p) {
+            var d = String(p.direction || '').toLowerCase();
+            var today = Number(d === 'short' ? (p.short_today || 0) : (p.long_today || 0));
+            var yd = Number(d === 'short' ? (p.short_yd || 0) : (p.long_yd || 0));
+            if (!today && !yd) return '—';
+            return today + '/' + yd;
+        }
+
+        function findPositionLegForContract(instrumentId) {
+            if (!instrumentId) return null;
+            var target = normalizeInstId(instrumentId);
+            for (var i = 0; i < controlPositions.length; i++) {
+                if (normalizeInstId(controlPositions[i].instrument_id) === target) {
+                    return controlPositions[i];
+                }
+            }
+            return null;
+        }
+
+        function setAction(action) {
+            currentAction = action || 'buy';
+            document.querySelectorAll('.action-btn').forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.action === currentAction);
             });
+            if (currentAction !== 'close') {
+                selectedPositionLeg = null;
+                renderControlPositions();
+            }
+            applyOrderTypePriceDisplay();
+            updateContractTitle(document.getElementById('contract-select').value);
+        }
+
+        function selectPositionLeg(leg) {
+            if (!leg || !leg.instrument_id) return;
+            selectedPositionLeg = leg;
+            lastPositionPayload = {
+                instrument_id: normalizeInstId(leg.instrument_id),
+                direction: leg.direction || '',
+                volume: leg.volume || 1,
+                long_today: leg.long_today || leg.short_today || 0,
+                long_yd: leg.long_yd || leg.short_yd || 0
+            };
+            setAction('close');
+            applyContractSelect(lastPositionPayload.instrument_id);
+            var vol = parseInt(lastPositionPayload.volume, 10);
+            if (!vol || vol < 1) vol = 1;
+            document.getElementById('order-volume').value = String(vol);
+            if (currentOrderType !== 'limit') {
+                refreshOrderPriceFromQuote().then(startQuotePoll);
+            }
+            renderControlPositions();
+            syncIframeHeight();
+        }
+
+        function renderControlPositions() {
+            var tbody = document.getElementById('control-positions-tbody');
+            if (!tbody) return;
+            if (!controlPositions.length) {
+                tbody.innerHTML = '<tr><td colspan="6">暂无持仓</td></tr>';
+                return;
+            }
+            tbody.innerHTML = controlPositions.map(function (p) {
+                var key = positionLegKey(p);
+                var profit = Number(p.position_profit || 0);
+                var profitClass = profit >= 0 ? 'pos-profit-up' : 'pos-profit-down';
+                var selected = selectedPositionLeg && positionLegKey(selectedPositionLeg) === key ? ' selected' : '';
+                return '<tr class="selectable' + selected + '" data-leg="' + key + '">' +
+                    '<td>' + normalizeInstId(p.instrument_id) + '</td>' +
+                    '<td class="' + directionLegClass(p.direction) + '">' + directionLegText(p.direction) + '</td>' +
+                    '<td>' + (p.volume || 0) + '</td>' +
+                    '<td>' + formatTodayYd(p) + '</td>' +
+                    '<td>' + (p.open_price ? Number(p.open_price).toFixed(0) : '—') + '</td>' +
+                    '<td class="' + profitClass + '">' + (profit >= 0 ? '+' : '') + profit.toFixed(0) + '</td>' +
+                    '</tr>';
+            }).join('');
+            tbody.querySelectorAll('tr.selectable').forEach(function (row) {
+                row.addEventListener('click', function () {
+                    var key = row.getAttribute('data-leg');
+                    for (var i = 0; i < controlPositions.length; i++) {
+                        if (positionLegKey(controlPositions[i]) === key) {
+                            selectPositionLeg(controlPositions[i]);
+                            break;
+                        }
+                    }
+                });
+            });
+            syncIframeHeight();
+        }
+
+        function refreshControlPositions(refresh) {
+            var b = bridge();
+            var tbody = document.getElementById('control-positions-tbody');
+            if (!b || !b.Trade || !b.Trade.queryPositions) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6">Bridge 未加载</td></tr>';
+                return Promise.resolve();
+            }
+            var uid = b.Trade.resolveUserId();
+            if (!uid) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6">未连接</td></tr>';
+                return Promise.resolve();
+            }
+            return b.Trade.queryPositions({ user_id: uid, refresh: !!refresh })
+                .then(function (data) {
+                    if (data && data.error) {
+                        if (tbody) tbody.innerHTML = '<tr><td colspan="6">查询失败</td></tr>';
+                        return;
+                    }
+                    var positions = (data && data.positions) || [];
+                    if (!positions.length && !refresh && uid && !positionsCtpSynced) {
+                        positionsCtpSynced = true;
+                        return refreshControlPositions(true);
+                    }
+                    controlPositions = positions;
+                    renderControlPositions();
+                })
+                .catch(function (err) {
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="6">加载失败: ' +
+                            ((err && err.message) || String(err)) + '</td></tr>';
+                    }
+                });
+        }
+
+        function resolveOrderParams() {
+            if (currentAction === 'buy') {
+                return { direction: 'buy', offset: 'open' };
+            }
+            if (currentAction === 'sell') {
+                return { direction: 'sell', offset: 'open' };
+            }
+            var leg = selectedPositionLeg || findPositionLegForContract(
+                document.getElementById('contract-select').value);
+            if (!leg) {
+                alert('平仓请先点击持仓列表选中一条，或刷新持仓后再试');
+                return null;
+            }
+            var dir = String(leg.direction || '').toLowerCase();
+            return {
+                direction: (dir === 'long' || dir === 'buy') ? 'sell' : 'buy',
+                offset: 'close',
+                volume: parseInt(leg.volume, 10) || 1
+            };
+        }
+
+        document.getElementById('action-buy').addEventListener('click', function () { setAction('buy'); });
+        document.getElementById('action-sell').addEventListener('click', function () { setAction('sell'); });
+        document.getElementById('action-close').addEventListener('click', function () {
+            setAction('close');
+            var leg = findPositionLegForContract(document.getElementById('contract-select').value);
+            if (leg) selectPositionLeg(leg);
+            else alert('当前合约无持仓，请先在下方列表选中要平的持仓');
+        });
+        document.getElementById('positions-refresh-btn').addEventListener('click', function () {
+            positionsCtpSynced = false;
+            refreshControlPositions(true);
         });
 
         document.querySelectorAll('.order-type-btn').forEach(btn => {
@@ -427,20 +828,42 @@
                 currentOrderType = this.dataset.type;
                 document.querySelectorAll('.order-type-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                
-                const priceInput = document.getElementById('order-price');
-                if (currentOrderType === 'market') {
-                    priceInput.disabled = true;
-                    priceInput.value = '';
-                } else if (currentOrderType === 'opponent') {
-                    priceInput.disabled = true;
-                    priceInput.value = currentDirection === 'buy' ? '对手买价' : '对手卖价';
-                } else {
-                    priceInput.disabled = false;
-                    priceInput.value = '';
-                }
+                applyOrderTypePriceDisplay();
+                refreshOrderPriceFromQuote().then(startQuotePoll);
             });
         });
+
+        function setSubmitButtonBusy(busy) {
+            const btn = document.getElementById('submit-order');
+            if (!btn) return;
+            btn.disabled = !!busy;
+            btn.textContent = busy ? '提交中…' : '提交委托';
+        }
+
+        function submitOrderPayload(orderPayload) {
+            setSubmitButtonBusy(true);
+            const b = bridge();
+            return b.Trade.sendOrder(orderPayload)
+                .then(function(res) {
+                    if (res && res.ok) {
+                        alert('委托已提交\nOrderRef: ' + (res.order_ref || '—'));
+                        refreshControlAccount(false);
+                        refreshControlPositions(true);
+                    } else {
+                        alert('报单失败: ' + ((res && (res.error || res.message)) || '未知错误'));
+                    }
+                })
+                .catch(function(err) {
+                    var msg = (err && err.message) || String(err);
+                    if (msg === 'Failed to fetch') {
+                        msg = '无法连接后端（服务未启动或正在重启），请确认 quant_sev_host 运行中后重试';
+                    }
+                    alert('报单失败: ' + msg);
+                })
+                .finally(function() {
+                    setSubmitButtonBusy(false);
+                });
+        }
 
         document.getElementById('submit-order').addEventListener('click', function() {
             const contract = document.getElementById('contract-select').value;
@@ -451,87 +874,139 @@
                 alert('交易 Bridge 未加载，请从主窗口打开交易页');
                 return;
             }
-            const orderPayload = {
-                instrument_id: contract,
-                direction: currentDirection,
-                offset: currentOffset.replace(/-/g, '_'),
-                price_type: currentOrderType,
-                volume: volume
-            };
+            if (!contract) {
+                alert('请选择合约');
+                return;
+            }
+            if (!volume || volume <= 0) {
+                alert('请输入有效手数');
+                return;
+            }
+
+            var orderParams = resolveOrderParams();
+            if (!orderParams) return;
+            if (currentAction === 'close') {
+                volume = orderParams.volume;
+                document.getElementById('order-volume').value = String(volume);
+            }
+
+            function buildPayload(resolvedPrice) {
+                var orderPayload = {
+                    instrument_id: contract,
+                    direction: orderParams.direction,
+                    offset: orderParams.offset,
+                    price_type: currentOrderType,
+                    volume: volume
+                };
+                if (currentOrderType === 'limit') {
+                    orderPayload.price = resolvedPrice;
+                } else if (resolvedPrice > 0) {
+                    orderPayload.price = resolvedPrice;
+                } else {
+                    orderPayload.price = 0;
+                }
+                return orderPayload;
+            }
+
             if (currentOrderType === 'limit') {
                 const price = parseFloat(priceRaw);
                 if (!price || price <= 0) {
                     alert('请输入有效限价');
                     return;
                 }
-                orderPayload.price = price;
-            } else {
-                orderPayload.price = 0;
+                submitOrderPayload(buildPayload(price));
+                return;
             }
-            const btn = document.getElementById('submit-order');
-            btn.disabled = true;
-            btn.textContent = '提交中…';
-            b.Trade.sendOrder(orderPayload)
-                .then(function(res) {
-                    if (res && res.ok) {
-                        alert('委托已提交\nOrderRef: ' + (res.order_ref || '—'));
-                        refreshControlAccount(false);
-                    } else {
-                        alert('报单失败: ' + ((res && (res.error || res.message)) || '未知错误'));
-                    }
-                })
-                .catch(function(err) {
-                    alert('报单失败: ' + (err.message || String(err)));
-                })
-                .finally(function() {
-                    btn.disabled = false;
-                    btn.textContent = '提交委托';
-                });
+
+            setSubmitButtonBusy(true);
+            refreshOrderPriceFromQuote().then(function () {
+                var px = resolveOrderPrice(currentDirection(), currentOrderType, lastQuoteSnapshot);
+                if (!px || px <= 0) {
+                    var parsed = parseFloat(priceRaw);
+                    if (parsed > 0) px = parsed;
+                }
+                if (!px || px <= 0) {
+                    alert('无法获取 ' + contract + ' 行情价，请确认行情已连接并已订阅该合约');
+                    return;
+                }
+                applyOrderTypePriceDisplay();
+                return submitOrderPayload(buildPayload(px));
+            }).catch(function (err) {
+                var msg = (err && err.message) || String(err);
+                alert('报单失败: ' + msg);
+            }).finally(function () {
+                var btn = document.getElementById('submit-order');
+                if (btn && btn.textContent === '提交中…' && btn.disabled) {
+                    setSubmitButtonBusy(false);
+                }
+            });
         });
 
         function loadContractOptions() {
-            const select = document.getElementById('contract-select');
-            const b = bridge();
-            if (!b || !b.Logger || !b.Logger.Transport) return;
-            b.Logger.Transport.get('/api/symbols').then(function(data) {
-                const symbols = (data && data.symbols) || [];
-                if (!symbols.length) return;
-                select.innerHTML = symbols.map(function(s) {
-                    const id = s.instrument_id || '';
-                    const label = (s.name ? s.name + ' ' : '') + id;
-                    return '<option value="' + id + '">' + label + '</option>';
+            var select = document.getElementById('contract-select');
+            var b = bridge();
+            if (!select || !b || !b.Logger || !b.Logger.Transport) {
+                return Promise.resolve();
+            }
+            var keepValue = normalizeInstId(select.value);
+            try {
+                var stored = localStorage.getItem('quant_sev_chart_instrument');
+                if (stored) keepValue = normalizeInstId(stored);
+            } catch (e) { /* ignore */ }
+            if (lastPositionPayload && lastPositionPayload.instrument_id) {
+                keepValue = normalizeInstId(lastPositionPayload.instrument_id);
+            }
+            return b.Logger.Transport.get('/api/symbols').then(function (data) {
+                var symbols = (data && data.symbols) || [];
+                var seen = {};
+                var options = [];
+                function pushOption(id, label) {
+                    var norm = normalizeInstId(id);
+                    if (!norm || seen[norm]) return;
+                    seen[norm] = true;
+                    options.push({ value: norm, label: label || norm });
+                }
+                symbols.forEach(function (s) {
+                    var id = s.instrument_id || '';
+                    var label = (s.name ? s.name + ' ' : '') + id;
+                    pushOption(id, label);
+                });
+                if (keepValue) pushOption(keepValue, keepValue);
+                if (lastPositionPayload && lastPositionPayload.instrument_id) {
+                    pushOption(lastPositionPayload.instrument_id, normalizeInstId(lastPositionPayload.instrument_id) + ' (持仓)');
+                }
+                if (!options.length) return;
+                select.innerHTML = options.map(function (o) {
+                    return '<option value="' + o.value + '">' + o.label + '</option>';
                 }).join('');
-            }).catch(function() { /* 保留默认选项 */ });
+                contractOptionsLoaded = true;
+                if (keepValue) {
+                    applyContractSelect(keepValue);
+                }
+                if (lastPositionPayload) {
+                    applyPositionForClose(lastPositionPayload);
+                }
+            }).catch(function () { /* 保留默认选项 */ });
         }
         loadContractOptions();
         refreshControlAccount(false);
+        refreshControlPositions(false);
         setInterval(function () { refreshControlAccount(false); }, 15000);
+        setInterval(function () { refreshControlPositions(false); }, 15000);
         try {
             window.parent.addEventListener('quant-sev-trade', function () {
                 refreshControlAccount(false);
+                refreshControlPositions(true);
             });
         } catch (e) { /* ignore */ }
 
-        document.getElementById('contract-select').addEventListener('change', function() {
-            var contract = this.value;
-            try {
-                localStorage.setItem('quant_sev_chart_instrument', contract);
-                localStorage.setItem('quant_sev_last_contract', contract);
-            } catch (e) { /* ignore */ }
-            try {
-                window.parent.dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: contract }));
-            } catch (e) { /* ignore */ }
-        });
-
-        window.addEventListener('message', function (ev) {
-            var data = ev.data;
-            if (!data || data.type !== 'quant-sev-set-contract' || !data.instrument_id) return;
+        function applyContractSelect(id) {
             var select = document.getElementById('contract-select');
-            if (!select) return;
-            var id = String(data.instrument_id);
+            if (!select || !id) return;
+            id = normalizeInstId(id);
             var found = false;
             for (var i = 0; i < select.options.length; i++) {
-                if (select.options[i].value.toLowerCase() === id.toLowerCase()) {
+                if (normalizeInstId(select.options[i].value) === id) {
                     select.selectedIndex = i;
                     found = true;
                     break;
@@ -541,10 +1016,81 @@
                 var opt = document.createElement('option');
                 opt.value = id;
                 opt.textContent = id;
-                select.appendChild(opt);
+                select.insertBefore(opt, select.firstChild);
                 select.value = id;
             }
+            try {
+                localStorage.setItem('quant_sev_chart_instrument', id);
+                localStorage.setItem('quant_sev_last_contract', id);
+            } catch (e) { /* ignore */ }
+            try {
+                window.parent.dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: id }));
+            } catch (e2) { /* ignore */ }
+            updateContractTitle(id);
+            refreshOrderPriceFromQuote().then(startQuotePoll);
+        }
+
+        function updateContractTitle(id) {
+            var title = document.getElementById('contract-section-title');
+            if (!title) return;
+            var actionText = currentAction === 'buy' ? '买入' : (currentAction === 'sell' ? '卖出' : '平仓');
+            if (currentAction === 'close' && selectedPositionLeg &&
+                normalizeInstId(selectedPositionLeg.instrument_id) === normalizeInstId(id)) {
+                var leg = directionLegText(selectedPositionLeg.direction);
+                title.textContent = '合约 · ' + normalizeInstId(id) + ' (' + actionText + ' ' + leg + ' ' +
+                    (selectedPositionLeg.volume || 1) + '手)';
+            } else {
+                title.textContent = '合约 · ' + normalizeInstId(id) + ' (' + actionText + ')';
+            }
+        }
+
+        function applyPositionForClose(payload) {
+            if (!payload || !payload.instrument_id) return;
+            var leg = {
+                instrument_id: normalizeInstId(payload.instrument_id),
+                direction: payload.direction || '',
+                volume: payload.volume || 1,
+                long_today: payload.long_today || 0,
+                long_yd: payload.long_yd || 0,
+                short_today: payload.short_today || 0,
+                short_yd: payload.short_yd || 0,
+                open_price: payload.open_price || 0,
+                position_profit: payload.position_profit || 0
+            };
+            selectPositionLeg(leg);
+        }
+
+        function onSelectPositionMessage(data) {
+            if (!data || !data.instrument_id) return;
+            applyPositionForClose(data);
+        }
+
+        document.getElementById('contract-select').addEventListener('change', function () {
+            if (currentAction !== 'close') {
+                selectedPositionLeg = null;
+                lastPositionPayload = null;
+            }
+            applyContractSelect(this.value);
         });
+
+        window.addEventListener('message', function (ev) {
+            var data = ev.data;
+            if (!data) return;
+            if (data.type === 'quant-sev-set-contract' && data.instrument_id) {
+                lastPositionPayload = null;
+                applyContractSelect(data.instrument_id);
+                return;
+            }
+            if (data.type === 'quant-sev-select-position' && data.instrument_id) {
+                onSelectPositionMessage(data);
+            }
+        });
+
+        try {
+            window.parent.addEventListener('quant-sev-select-position', function (ev) {
+                onSelectPositionMessage(ev && ev.detail);
+            });
+        } catch (e) { /* ignore */ }
 
         function syncIframeHeight() {
             var h = document.documentElement.scrollHeight;
@@ -560,9 +1106,11 @@
             document.addEventListener('DOMContentLoaded', function () {
                 syncIframeHeight();
                 refreshControlAccount(false);
+                refreshControlPositions(false);
             });
         } else {
             syncIframeHeight();
+            refreshControlPositions(false);
         }
         window.addEventListener('resize', syncIframeHeight);
     </script>

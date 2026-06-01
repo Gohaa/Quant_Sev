@@ -143,6 +143,26 @@
             return String(p.instrument_id || '') + '|' + String(p.direction || '');
         }
 
+        function notifyPositionSelect(pos) {
+            if (!pos || !pos.instrument_id) return;
+            var payload = {
+                type: 'quant-sev-select-position',
+                instrument_id: String(pos.instrument_id || '').trim(),
+                direction: pos.direction || '',
+                volume: pos.volume || 1
+            };
+            try {
+                if (window.parent.QuantSevBridge && window.parent.QuantSevBridge.TradeUi) {
+                    window.parent.QuantSevBridge.TradeUi.selectPositionForClose(payload);
+                } else {
+                    window.parent.postMessage(payload, '*');
+                    window.parent.dispatchEvent(new CustomEvent('quant-sev-select-position', { detail: payload }));
+                }
+            } catch (e) {
+                try { window.parent.postMessage(payload, '*'); } catch (e2) { /* ignore */ }
+            }
+        }
+
         function renderPositions(data) {
             var tbody = document.getElementById('position-tbody');
             var summary = document.querySelector('.position-summary');
@@ -173,7 +193,10 @@
                 var profit = Number(pos.position_profit || 0);
                 var profitClass = profit >= 0 ? 'profit-up' : 'profit-down';
                 var selected = selectedPositionKey === key ? ' selected' : '';
-                return '<tr class="position-row selectable' + selected + '" data-leg="' + key + '">' +
+                return '<tr class="position-row selectable' + selected + '" data-leg="' + key + '"' +
+                    ' data-inst="' + (pos.instrument_id || '') + '"' +
+                    ' data-dir="' + (pos.direction || '') + '"' +
+                    ' data-vol="' + (pos.volume || 0) + '">' +
                     '<td>' + (pos.instrument_id || '—') + '</td>' +
                     '<td class="' + directionLegClass(pos.direction) + '">' + directionLegText(pos.direction) + '</td>' +
                     '<td>' + (pos.volume || 0) + '</td>' +
@@ -185,6 +208,11 @@
             tbody.querySelectorAll('tr.position-row.selectable').forEach(function (row) {
                 row.addEventListener('click', function () {
                     selectedPositionKey = row.getAttribute('data-leg');
+                    notifyPositionSelect({
+                        instrument_id: row.getAttribute('data-inst'),
+                        direction: row.getAttribute('data-dir'),
+                        volume: parseInt(row.getAttribute('data-vol'), 10) || 1
+                    });
                     renderPositions(data);
                 });
             });

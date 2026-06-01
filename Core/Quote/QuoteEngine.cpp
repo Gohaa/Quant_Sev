@@ -115,7 +115,8 @@ void MdSpiImpl::OnRspUserLogin(CThostFtdcRspUserLoginField* /*pRspUserLogin*/,
     } else {
         session_->logged_in = true;
         session_->last_error.clear();
-        Logger::instance().ctp("Md 登录成功: " + session_->account.user_id + " @ " + session_->front);
+        Logger::instance().ctp("DialogRsp: Md OnRspUserLogin OK user=" + session_->account.user_id + " @ " +
+                               session_->front);
         resubscribe_instruments(session_);
     }
     session_->cv.notify_all();
@@ -131,7 +132,7 @@ void MdSpiImpl::OnRspSubMarketData(CThostFtdcSpecificInstrumentField* pSpecificI
     if (pRspInfo != nullptr && pRspInfo->ErrorID != 0) {
         Logger::instance().warn("Md 订阅失败 " + instrument + ": " + trim_cstr(pRspInfo->ErrorMsg));
     } else if (!instrument.empty()) {
-        Logger::instance().ctp("Md 订阅成功: " + instrument);
+        Logger::instance().ctp("DialogRsp: Md OnRspSubMarketData OK " + instrument);
     }
 }
 

@@ -869,10 +869,19 @@
 
         window.addEventListener('message', function (ev) {
             var data = ev.data;
-            if (!data || data.type !== 'quant-sev-iframe-resize' || !data.id) return;
-            var frame = document.getElementById(data.id);
-            if (!frame || !data.height) return;
-            frame.style.height = Math.max(120, data.height) + 'px';
+            if (!data) return;
+            if (data.type === 'quant-sev-iframe-resize' && data.id) {
+                var frame = document.getElementById(data.id);
+                if (frame && data.height) {
+                    frame.style.height = Math.max(120, data.height) + 'px';
+                }
+                return;
+            }
+            if (data.type === 'quant-sev-select-position' && data.instrument_id) {
+                if (window.QuantSevBridge && QuantSevBridge.TradeUi) {
+                    QuantSevBridge.TradeUi.selectPositionForClose(data);
+                }
+            }
         });
 
         // 右侧翻页切换功能

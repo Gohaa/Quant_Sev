@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "Account/AccountService.hpp"
+#include "Common/ContractRules.hpp"
 #include "Config/Config.hpp"
 #include "CTA/CtaEngine.hpp"
 #include "Quote/QuoteEngine.hpp"
@@ -103,9 +104,15 @@ private:
     void track_order_send_time(const std::string& user_id, const std::string& order_ref);
     void on_order_update_rtt(const nlohmann::json& update);
 
+    std::string web_offset_to_trade_offset(const std::string& web_offset,
+                                           const std::string& instrument_id,
+                                           const std::string& direction,
+                                           const std::optional<CtaPositionView>& position) const;
+
     Config& config_;
     GatewayStatus status_;
     AccountService accounts_;
+    bll::ContractRules contract_rules_;
     QuoteEngine quote_;
     TradeEngine trade_;
     CtaEngine cta_;

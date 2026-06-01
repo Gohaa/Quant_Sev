@@ -6,6 +6,7 @@
 #include <sstream>
 #include <thread>
 
+#include "Common/ContractRules.hpp"
 #include "Backtest/BacktestEngine.hpp"
 #include "Backtest/BacktestTypes.hpp"
 #include "Bar/BarEngine.hpp"
@@ -28,6 +29,21 @@
 #endif
 
 namespace quant_sev::core {
+
+namespace {
+
+std::string to_upper_ascii(std::string text) {
+    for (char& ch : text) {
+        ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    }
+    return text;
+}
+
+bool is_valid_web_offset(const std::string& offset) {
+    return offset == "open" || offset == "close" || offset.empty();
+}
+
+}  // namespace
 
 Gateway::Gateway(Config& config)
     : config_(config),
@@ -67,6 +83,10 @@ bool Gateway::initialize() {
     }
     if (!risk_.load(config_)) {
         Logger::instance().warn("Risk 加载失败");
+    }
+    const auto rules_path = config_.root_dir() / "config" / "Contract_Rules.json";
+    if (!contract_rules_.load(rules_path.string())) {
+        Logger::instance().warn("ContractRules 加载失败，Web 平仓将默认映射为 close");
     }
     cta_.set_order_executor([this](const AccountRecord& account, const OrderRequest& order) {
         return execute_order(account, order, false);
@@ -219,6 +239,11 @@ void Gateway::set_trade_listener(TradeListener listener) {
 OrderResult Gateway::execute_order(const AccountRecord& account, const OrderRequest& order, bool manual_order,
                                    RiskCheckMode risk_mode) {
     OrderResult blocked;
+    const auto position = cta_.position_for(account.user_id, order.instrument_id);
+    OrderRequest trade_order = order;
+    trade_order.offset =
+        web_offset_to_trade_offset(order.offset, order.instrument_id, order.direction, position);
+
     if (risk_mode != RiskCheckMode::EmergencyClose) {
         const auto time_result = time_check_.check(manual_order);
         if (!time_result.ok) {
@@ -229,12 +254,11 @@ OrderResult Gateway::execute_order(const AccountRecord& account, const OrderRequ
     }
 
     const nlohmann::json positions_view = cta_.positions_view({{"user_id", account.user_id}});
-    const auto position = cta_.position_for(account.user_id, order.instrument_id);
     const auto ctp_account = trade_.cached_trading_account(account.user_id);
     const TradingAccountSnapshot* ctp_ptr = ctp_account ? &*ctp_account : nullptr;
-    const auto quote_snap = quote_snapshot_for(order.instrument_id);
+    const auto quote_snap = quote_snapshot_for(trade_order.instrument_id);
     const InstrumentQuoteSnapshot* quote_ptr = quote_snap ? &*quote_snap : nullptr;
-    const auto risk_result = risk_.check_new_order(account, order, position ? &*position : nullptr, positions_view,
+    const auto risk_result = risk_.check_new_order(account, trade_order, position ? &*position : nullptr, positions_view,
                                                    ctp_ptr, risk_mode, quote_ptr);
     if (!risk_result.ok) {
         blocked.message = risk_result.message;
@@ -243,9 +267,9 @@ OrderResult Gateway::execute_order(const AccountRecord& account, const OrderRequ
         return blocked;
     }
 
-    const OrderResult result = trade_.insert_order(account, order);
+    const OrderResult result = trade_.insert_order(account, trade_order);
     if (result.ok) {
-        risk_.on_order_accepted(account.user_id, &order);
+        risk_.on_order_accepted(account.user_id, &trade_order);
         if (!result.order_ref.empty()) {
             track_order_send_time(account.user_id, result.order_ref);
         }
@@ -253,8 +277,46 @@ OrderResult Gateway::execute_order(const AccountRecord& account, const OrderRequ
     return result;
 }
 
+std::string Gateway::web_offset_to_trade_offset(const std::string& web_offset,
+                                                const std::string& instrument_id,
+                                                const std::string& direction,
+                                                const std::optional<CtaPositionView>& position) const {
+    if (web_offset == "open" || web_offset.empty()) {
+        return "open";
+    }
+    if (web_offset == "close_today" || web_offset == "close-today") {
+        return "close_today";
+    }
+    if (web_offset != "close") {
+        return web_offset;
+    }
+    if (const auto parsed = contract_rules_.parse(instrument_id)) {
+        if (parsed->exchange == "SHFE" || parsed->exchange == "INE") {
+            const bool closing_long = direction == "sell";
+            const int today_vol =
+                closing_long ? (position ? position->long_today : 0) : (position ? position->short_today : 0);
+            const int yd_vol =
+                closing_long ? (position ? position->long_yd : 0) : (position ? position->short_yd : 0);
+            if (today_vol > 0 && yd_vol == 0) {
+                return "close_today";
+            }
+            if (yd_vol > 0) {
+                return "close";
+            }
+            if (today_vol > 0) {
+                return "close_today";
+            }
+            return "close";
+        }
+    }
+    return "close";
+}
+
 OrderResult Gateway::execute_emergency_close(const AccountRecord& account, const OrderRequest& order) {
-    if (order.offset != "close" && order.offset != "close_today") {
+    const auto position = cta_.position_for(account.user_id, order.instrument_id);
+    const std::string trade_offset =
+        web_offset_to_trade_offset(order.offset, order.instrument_id, order.direction, position);
+    if (trade_offset != "close" && trade_offset != "close_today") {
         OrderResult blocked;
         blocked.message = "应急通道仅允许平仓";
         return blocked;
@@ -291,7 +353,9 @@ nlohmann::json Gateway::md_quote_board() const {
     nlohmann::json quote_map = nlohmann::json::object();
     for (const auto& row : quotes) {
         if (row.contains("instrument_id")) {
-            quote_map[row["instrument_id"].get<std::string>()] = row;
+            const auto id = row["instrument_id"].get<std::string>();
+            quote_map[id] = row;
+            quote_map[to_upper_ascii(id)] = row;
         }
     }
 
@@ -300,8 +364,15 @@ nlohmann::json Gateway::md_quote_board() const {
         for (const auto& item : symbol_doc["symbols"]) {
             nlohmann::json row = item;
             const auto id = item.value("instrument_id", "");
-            if (!id.empty() && quote_map.contains(id)) {
-                row["quote"] = quote_map[id];
+            if (!id.empty()) {
+                if (quote_map.contains(id)) {
+                    row["quote"] = quote_map[id];
+                } else {
+                    const auto upper = to_upper_ascii(id);
+                    if (quote_map.contains(upper)) {
+                        row["quote"] = quote_map[upper];
+                    }
+                }
             }
             board.push_back(row);
         }
@@ -472,6 +543,7 @@ ApiResponse Gateway::handle_get(const std::string& path, const std::string& quer
                  {"connected_md_fronts", md_sessions.value("fronts", nlohmann::json::array())},
                  {"connected_md_users", md_sessions.value("users", nlohmann::json::array())},
                  {"connected_td_users", td_sessions.value("users", nlohmann::json::array())},
+                 {"connected_td_sessions", td_sessions.value("sessions", nlohmann::json::array())},
                  {"reconnect", reconnect_status()},
                  {"ctp_enabled",
 #ifdef QUANT_SEV_HAS_CTP
@@ -490,7 +562,8 @@ ApiResponse Gateway::handle_get(const std::string& path, const std::string& quer
                 const bool md_by_front = !md_front.empty() && quote_.is_front_ready(md_front);
                 const bool md_by_user = !user_id.empty() && quote_.is_user_md_ready(user_id);
                 acc["md_connected"] = md_by_front || md_by_user;
-                acc["td_connected"] = !user_id.empty() && trade_.is_user_ready(user_id);
+                acc["td_connected"] = trade_.is_account_ready(
+                    AccountRecord::from_json(acc));
             }
         }
         return {200, body};
@@ -1004,37 +1077,7 @@ ApiResponse Gateway::handle_get(const std::string& path, const std::string& quer
 }
 
 std::optional<AccountRecord> Gateway::resolve_account(const nlohmann::json& payload) const {
-    const std::string user_id = payload.value("user_id", "");
-    const std::string name = payload.value("name", "");
-    const std::string md_front = payload.value("md_front", "");
-    const std::string td_front = payload.value("td_front", payload.value("trader_front", ""));
-
-    const auto accounts = accounts_.list_accounts();
-    if (!name.empty()) {
-        for (const auto& account : accounts) {
-            if (account.name == name) {
-                return account;
-            }
-        }
-    }
-    if (!user_id.empty() && (!md_front.empty() || !td_front.empty())) {
-        for (const auto& account : accounts) {
-            if (account.user_id != user_id) {
-                continue;
-            }
-            if (!md_front.empty() && account.md_front != md_front) {
-                continue;
-            }
-            if (!td_front.empty() && account.td_front != td_front) {
-                continue;
-            }
-            return account;
-        }
-    }
-    if (!user_id.empty()) {
-        return accounts_.find_by_user_id(user_id);
-    }
-    return std::nullopt;
+    return accounts_.resolve(payload);
 }
 
 ApiResponse Gateway::connect_result_to_response(const ConnectResult& result) const {
@@ -1103,7 +1146,10 @@ ApiResponse Gateway::handle_post(const std::string& path, const std::string& bod
                 do_sub = json_bool_param(payload, "subscribe_all", true);
             }
             if (do_sub) {
-                nlohmann::json sub_payload = {{"user_id", account->user_id}, {"subscribe_all", true}};
+                nlohmann::json sub_payload = {{"name", account->name},
+                                              {"user_id", account->user_id},
+                                              {"md_front", account->md_front},
+                                              {"subscribe_all", true}};
                 const auto sub_result = symbols_.load_symbols(sub_payload);
                 if (sub_result.ok) {
                     response.body["symbol_subscribe"] = sub_result.message;
@@ -1128,7 +1174,7 @@ ApiResponse Gateway::handle_post(const std::string& path, const std::string& bod
         if (td_result.ok) {
             register_td_session(*account);
             refresh_trading_account_cache(*account);
-            response.body["td_connected"] = trade_.is_user_ready(account->user_id);
+            response.body["td_connected"] = trade_.is_account_ready(*account);
             response.body["connected_td_user"] = account->user_id;
         }
         return response;
@@ -1158,7 +1204,7 @@ ApiResponse Gateway::handle_post(const std::string& path, const std::string& bod
             return {400, {{"error", "未找到账户 user_id"}}};
         }
         unregister_td_session();
-        return connect_result_to_response(trade_.disconnect(account->user_id));
+        return connect_result_to_response(trade_.disconnect(*account));
     }
 
     if (path == "/api/order") {
@@ -1182,6 +1228,9 @@ ApiResponse Gateway::handle_post(const std::string& path, const std::string& bod
         }
         if (order.instrument_id.empty()) {
             return {400, {{"ok", false}, {"error", "instrument_id 必填"}}};
+        }
+        if (!is_valid_web_offset(order.offset)) {
+            return {400, {{"ok", false}, {"error", "offset 仅支持 open 或 close"}}};
         }
         if (order.volume <= 0) {
             return {400, {{"ok", false}, {"error", "volume 必须大于 0"}}};
@@ -1581,8 +1630,20 @@ std::optional<InstrumentQuoteSnapshot> Gateway::quote_snapshot_for(const std::st
     if (instrument_id.empty()) {
         return std::nullopt;
     }
+    const auto same_instrument = [&](const std::string& left, const std::string& right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < left.size(); ++i) {
+            if (std::tolower(static_cast<unsigned char>(left[i])) !=
+                std::tolower(static_cast<unsigned char>(right[i]))) {
+                return false;
+            }
+        }
+        return true;
+    };
     for (const auto& row : quote_.quote_board()) {
-        if (row.value("instrument_id", std::string{}) == instrument_id) {
+        if (same_instrument(row.value("instrument_id", std::string{}), instrument_id)) {
             InstrumentQuoteSnapshot snap;
             snap.last_price = row.value("last_price", 0.0);
             snap.upper_limit = row.value("upper_limit", 0.0);

@@ -57,10 +57,50 @@
         return String((item && item.instrument_id) || '').toLowerCase();
     }
 
+    function normalizeInstId(id) {
+        return String(id || '').trim().toUpperCase();
+    }
+
+    function switchToTradePanel() {
+        var tab = document.querySelector('.trade-right-tab[data-page="trade-panel"]');
+        if (tab && !tab.classList.contains('active')) {
+            tab.click();
+        }
+    }
+
+    function postToControlFrame(payload) {
+        var controlFrame = document.getElementById('trade-control-frame-right');
+        if (!controlFrame || !controlFrame.contentWindow) return;
+        try {
+            controlFrame.contentWindow.postMessage(payload, '*');
+        } catch (e) { /* ignore */ }
+    }
+
+    function selectPositionForClose(payload) {
+        if (!payload || !payload.instrument_id) return;
+        var normalized = {
+            type: 'quant-sev-select-position',
+            instrument_id: normalizeInstId(payload.instrument_id),
+            direction: payload.direction || '',
+            volume: payload.volume || 1
+        };
+        switchToTradePanel();
+        selectedContract = normalized.instrument_id.toLowerCase();
+        try {
+            global.localStorage.setItem('quant_sev_chart_instrument', normalized.instrument_id);
+            global.localStorage.setItem('quant_sev_last_contract', normalized.instrument_id);
+        } catch (e) { /* ignore */ }
+        global.dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: normalized.instrument_id }));
+        global.dispatchEvent(new CustomEvent('quant-sev-select-position', { detail: normalized }));
+        renderContractTable(lastBoard);
+        postToControlFrame(normalized);
+        setTimeout(function () { postToControlFrame(normalized); }, 120);
+    }
+
     function selectContract(instrumentId) {
         if (!instrumentId) return;
-        var id = String(instrumentId).toLowerCase();
-        selectedContract = id;
+        var id = normalizeInstId(instrumentId);
+        selectedContract = id.toLowerCase();
         try {
             global.localStorage.setItem('quant_sev_chart_instrument', id);
             global.localStorage.setItem('quant_sev_last_contract', id);
@@ -68,12 +108,7 @@
 
         global.dispatchEvent(new CustomEvent('quant-sev-chart-instrument', { detail: id }));
 
-        var controlFrame = document.getElementById('trade-control-frame-right');
-        if (controlFrame && controlFrame.contentWindow) {
-            try {
-                controlFrame.contentWindow.postMessage({ type: 'quant-sev-set-contract', instrument_id: id }, '*');
-            } catch (e) { /* ignore */ }
-        }
+        postToControlFrame({ type: 'quant-sev-set-contract', instrument_id: id });
 
         renderContractTable(lastBoard);
     }
@@ -103,7 +138,7 @@
         tbody.innerHTML = rows.map(function (item) {
             var id = instrumentId(item);
             var q = quoteRow(item);
-            var cls = id === selected ? ' class="selected"' : '';
+            var cls = normalizeInstId(id) === normalizeInstId(selected) ? ' class="selected"' : '';
             return '<tr data-inst="' + escapeHtml(id) + '"' + cls + '>' +
                 '<td>' + escapeHtml(id) + '</td>' +
                     '<td>' + formatPrice(q.last_price) + '</td>' +
@@ -140,25 +175,29 @@
         });
     }
 
+    var accountLoadedOnce = false;
+
     function refreshAccount(refresh) {
         if (!global.QuantSevBridge || !QuantSevBridge.Trade) return Promise.resolve();
-        var uid = QuantSevBridge.Trade.resolveUserId();
-        if (!uid) {
+        var ctx = QuantSevBridge.Trade.resolveAccountContext();
+        if (!ctx.user_id) {
             setText('trade-acct-user', '未连接');
             return Promise.resolve();
         }
-        return QuantSevBridge.Trade.queryTradingAccount({ user_id: uid, refresh: !!refresh })
+        var doRefresh = !!refresh || !accountLoadedOnce;
+        return QuantSevBridge.Trade.queryTradingAccount({ refresh: doRefresh })
             .then(function (data) {
+                accountLoadedOnce = true;
                 var acc = (data && data.account) || {};
                 if (data.error) {
-                    setText('trade-acct-user', uid);
+                    setText('trade-acct-user', ctx.name || ctx.user_id);
                     return;
                 }
                 if (!data.cached && !acc.balance) {
-                    setText('trade-acct-user', uid + ' (无缓存)');
+                    setText('trade-acct-user', (ctx.name || ctx.user_id) + ' (无缓存)');
                     return;
                 }
-                setText('trade-acct-user', acc.account_id || uid);
+                setText('trade-acct-user', acc.account_id || ctx.name || ctx.user_id);
                 setMoney('trade-acct-available', acc.available);
                 setMoney('trade-acct-balance', acc.balance);
                 setMoney('trade-acct-margin', acc.curr_margin);
@@ -176,7 +215,7 @@
                 }
             })
             .catch(function () {
-                setText('trade-acct-user', uid);
+                setText('trade-acct-user', ctx.name || ctx.user_id);
             });
     }
 
@@ -234,6 +273,7 @@
     global.QuantSevBridge = global.QuantSevBridge || {};
     global.QuantSevBridge.TradeUi = {
         selectContract: selectContract,
+        selectPositionForClose: selectPositionForClose,
         refreshAccount: refreshAccount,
         renderContractTable: renderContractTable,
         init: init

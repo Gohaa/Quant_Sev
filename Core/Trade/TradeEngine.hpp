@@ -26,7 +26,7 @@ public:
     TradeEngine& operator=(const TradeEngine&) = delete;
 
     ConnectResult connect(const AccountRecord& account);
-    ConnectResult disconnect(const std::string& user_id);
+    ConnectResult disconnect(const AccountRecord& account);
     OrderResult insert_order(const AccountRecord& account, const OrderRequest& request);
     CancelResult cancel_order(const AccountRecord& account, const CancelOrderRequest& request);
     nlohmann::json order_updates(const nlohmann::json& query) const;
@@ -40,6 +40,7 @@ public:
     void set_disconnect_callback(std::function<void(const std::string& user_id, int reason)> callback);
     bool is_ready() const;
     bool is_user_ready(const std::string& user_id) const;
+    bool is_account_ready(const AccountRecord& account) const;
     nlohmann::json td_sessions_status() const;
     void set_project_root(const std::filesystem::path& root);
 
